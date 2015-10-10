@@ -4,6 +4,7 @@
 #include <fstream>
 #include <string>
 #include <array>
+#include <unordered_map>
 
 #include "Chip8Types.h"
 
@@ -100,6 +101,7 @@ namespace
    using Extractor         = std::function<Register()>;
    template<size_t S>
    using Opcodes           = std::array<OpcodeRunner, S>;
+   using Mapping           = std::unordered_map<Register, OpcodeRunner>;
 
    Register nnn(Opcode opcode)
    {
@@ -143,11 +145,12 @@ public:
    ,V0(FromV(0))  // alias
    ,runner(withMask(0xF000, Opcodes<26>
    {{
-      //TODO: They are not consecutive
-      withMask(0x0FFF, Opcodes<2>{{
-         clearDisplay(),
-         returnFromSubroutine(),
-      }}), 
+      withMask(0x00FF, 
+         Mapping{
+            {0x00E0, clearDisplay()}, 
+            {0x00EE, returnFromSubroutine()}
+         }
+      ), 
       jumpTo(nnn), 
       callTo(nnn),
       skipIfEquals(Vx, kk),
@@ -155,42 +158,43 @@ public:
       skipIfEquals(Vx, Vy),
       setToV(x, kk),
       addToV(x, kk),
-      withMask(0x000F, Opcodes<9>{{
-         setToV(x, Vy),
-         orToV(x, Vy), 
-         andToV(x, Vy),
-         xorToV(x, Vy),  
-         addToV(x, Vy),
-         subtractToV(x, Vy), 
-         shiftRightToV(x, Vy), 
-         subtractNumericToV(x, Vy), 
-         shiftLeftToV(x, Vy),
+      withMask(0x000F, 
+         Opcodes<9>{{
+            setToV(x, Vy),
+            orToV(x, Vy), 
+            andToV(x, Vy),
+            xorToV(x, Vy),  
+            addToV(x, Vy),
+            subtractToV(x, Vy), 
+            shiftRightToV(x, Vy), 
+            subtractNumericToV(x, Vy), 
+            shiftLeftToV(x, Vy),
       }}),
       skipIfNotEquals(Vx, Vy),
       addTo(&Machine::I, nnn),
       jumpTo(V0, nnn),
       setToV(x, randomAnd(kk)),
       display(Vx, Vy, n),
-      //TODO: They are not consecutive
-      withMask(0x0FF, Opcodes<2>{{
-         skipIfPressed(Vx), 
-         skipIfNotPressed(Vx), 
-      }}),
-      //TODO: They are not consecutive
-      withMask(0x0FF, Opcodes<9>{{
-         setToV(x, From(&Machine::delayTimer)),
-         setToV(x, keyPressed),
-         setTo(&Machine::delayTimer, Vx),
-         setTo(&Machine::soundTimer, Vx),
-         addTo(&Machine::I, Vx),
-         setToF(Vx),
-         setToB(Vx),
-         storeToMemory(V0, Vx),
-         readFromMemory(V0, Vx),
-      }}),
+      withMask(0x0FF, 
+         Mapping{
+            {0x009E, skipIfPressed(Vx)},
+            {0x00A1, skipIfNotPressed(Vx)}
+         }), 
+      withMask(0x0FF, 
+         Mapping{
+            {0x0007, setToV(x, From(&Machine::delayTimer))},
+            {0x000A, setToV(x, keyPressed)},
+            {0x0015, setTo(&Machine::delayTimer, Vx)},
+            {0x0018, setTo(&Machine::soundTimer, Vx)},
+            {0x001E, addTo(&Machine::I, Vx)},
+            {0x0029, setToF(Vx)},
+            {0x0033, setToB(Vx)},
+            {0x0055, storeToMemory(V0, Vx)},
+            {0x0065, readFromMemory(V0, Vx)},
+         }),
    }}))
-   {}
-   
+   {} 
+
    void loadGame(const std::string& name)
    {
       std::ifstream file(name, std::ios::binary);
@@ -249,7 +253,7 @@ private:
          return machine.*attribute;
       };
    }
- 
+  
    template<size_t S>
    OpcodeRunner withMask(Opcode mask, Opcodes<S> runners)
    {
@@ -257,6 +261,15 @@ private:
       {
          auto instruction = opcode & mask;
          runners[instruction](opcode);
+      };
+   }
+
+   OpcodeRunner withMask(Opcode mask, Mapping runners)
+   {
+      return [&](Opcode opcode)
+      {
+         auto instruction = opcode & mask;
+         runners.at(instruction)(opcode);
       };
    }
    
