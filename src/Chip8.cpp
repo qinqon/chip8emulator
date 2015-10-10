@@ -101,8 +101,6 @@ namespace
    template<size_t S>
    using Opcodes           = std::array<OpcodeRunner, S>;
 
-   void nop(Opcode){}
-  
    Register nnn(Opcode opcode)
    {
       return opcode & 0x0FFF;
@@ -124,7 +122,7 @@ namespace
 
    Register y(Opcode opcode)
    {
-      return opcode & 0X00F0;
+      return opcode & 0x00F0;
    }
    
    Register keyPressed()
@@ -143,7 +141,7 @@ public:
    ,Vx(FromV(&x)) // alias
    ,Vy(FromV(&y)) // alias
    ,V0(FromV(0))  // alias
-   ,runner(withMask(0xF000, Opcodes<35>
+   ,runner(withMask(0xF000, Opcodes<26>
    {{
       //TODO: They are not consecutive
       withMask(0x0FFF, Opcodes<2>{{
@@ -190,10 +188,6 @@ public:
          storeToMemory(V0, Vx),
          readFromMemory(V0, Vx),
       }}),
-      nop, nop, nop, nop, 
-      nop, nop, nop, nop, nop, 
-      nop, nop, nop, nop, nop, 
-      nop, nop, nop, nop, nop, 
    }}))
    {}
    

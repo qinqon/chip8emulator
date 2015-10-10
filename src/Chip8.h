@@ -12,7 +12,6 @@ public:
    void emulateCycle();
    void setKeys();
    bool drawFlag;
-   static const int MEMORY_SIZE = 4096;
 private:
    class Pimpl;
    std::unique_ptr<Pimpl> pimpl;
