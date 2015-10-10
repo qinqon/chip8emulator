@@ -9,6 +9,8 @@ using Register = unsigned char;
 
 using Counter = unsigned short;
 
+using Timer = unsigned char;
+
 // The Chip 8 has 4K memory in total
 using Memory = std::array<Register, 4096>;
 

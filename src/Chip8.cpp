@@ -9,6 +9,7 @@
 
 namespace
 {
+
    std::array<unsigned char, 80> chip8_fontset ={
    { 
       0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -31,9 +32,12 @@ namespace
    
    class Machine
    {
-   public:
+    public:
       Machine()
       :sp(0)
+      ,I(0)
+      ,delayTimer(0)
+      ,soundTimer(0)
       ,pc(0)
       {
          clearMemory();
@@ -72,6 +76,9 @@ namespace
       Stack::size_type sp;
       Stack stack;
       Registers V;
+      Counter I;
+      Timer delayTimer;
+      Timer soundTimer;
    private:
  
       Memory memory;
@@ -90,7 +97,10 @@ namespace
    // We are going to capture with the lambda so we need a std::function
    using OpcodeRunner      = std::function<void(Opcode)>;
    using OpcodeExtractor   = std::function<Register(Opcode)>;
-   
+   using Extractor         = std::function<Register()>;
+   template<size_t S>
+   using Opcodes           = std::array<OpcodeRunner, S>;
+
    void nop(Opcode){}
   
    Register nnn(Opcode opcode)
@@ -101,7 +111,12 @@ namespace
    {
       return opcode & 0x00FF;
    }
-   
+    
+   Register n(Opcode opcode)
+   {
+      return opcode & 0x000F;
+   }
+
    Register x(Opcode opcode)
    {
       return opcode & 0x0F00;
@@ -111,35 +126,140 @@ namespace
    {
       return opcode & 0X00F0;
    }
+
+   Register keyPressed()
+   {
+      //TODO: Wait for a key to be pressed and return the value
+      return 0;
+   }
+
 }
 class Chip8::Pimpl
 {
+
 public:
    Pimpl()
    :machine() // I know it's not needed but is good to be consistent
-   ,Vx(V(&x)) // alias
-   ,Vy(V(&y)) // alias
-   ,opcodes{{
+   ,Vx(FromV(&x)) // alias
+   ,Vy(FromV(&y)) // alias
+   ,V0(FromV(0))  // alias
+   ,delayTimer(From(&Machine::delayTimer)) // alias
+   ,soundTimer(From(&Machine::soundTimer)) // alias
+   ,runner(withMask(0xF000, Opcodes<35>
+   {{
       nop, 
       jumpTo(nnn), 
       callTo(nnn),
       skipIfEquals(Vx, kk),
       skipIfNotEquals(Vx, kk),
       skipIfEquals(Vx, Vy),
-      nop, nop, nop, 
+      setToV(x, kk),
+      addToV(x, kk),
+      withMask(0x000F, Opcodes<9>{{
+         setToV(x, Vy),
+         orToV(x, Vy), 
+         andToV(x, Vy),
+         xorToV(x, Vy),  
+         addToV(x, Vy),
+         subtractToV(x, Vy), 
+         shiftRightToV(x, Vy), 
+         subtractNumericToV(x, Vy), 
+         shiftLeftToV(x, Vy),
+      }}),
+      skipIfNotEquals(Vx, Vy),
+      addToI(nnn),
+      jumpTo(V0, nnn),
+      setToV(x, randomAnd(kk)),
+      display(Vx, Vy, n),
+      withMask(0x0FF, Opcodes<2>{{
+         skipIfPressed(Vx), 
+         skipIfNotPressed(Vx), 
+      }}),
+      withMask(0x0FF, Opcodes<9>{{
+         setToV(x, delayTimer),
+         setToV(x, keyPressed),
+         nop, nop, nop, nop, nop, nop, nop,
+      }}),
+      nop, nop, nop, nop, 
       nop, nop, nop, nop, nop, 
       nop, nop, nop, nop, nop, 
       nop, nop, nop, nop, nop, 
-      nop, nop, nop, nop, nop, 
-      nop, nop, nop, nop, nop, 
-   }}
+   }}))
    {}
    
-   OpcodeExtractor V(OpcodeExtractor extractor)
+   void loadGame(const std::string& name)
+   {
+      std::ifstream file(name, std::ios::binary);
+      if (file.is_open())
+      {
+         // Put the cursor at the beginning
+         file.seekg(0, std::ios::beg);
+         file.read(reinterpret_cast<char*>(machine.getMemory()), machine.getMemorySize());
+         file.close();
+      }
+   }
+   
+  
+   void emulateCycle()
+   {
+      Opcode opcode = machine.fetchOpcode();
+      runner(opcode);
+      std::cout << opcode << std::endl;
+   }
+   
+   void setKeys()
+   {
+   }
+
+
+private:
+
+   Machine machine;
+   OpcodeExtractor Vx;
+   OpcodeExtractor Vy;
+   Extractor V0;
+   Extractor delayTimer;
+   Extractor soundTimer;
+
+   OpcodeRunner runner;
+    
+   void skipInstruction()
+   {
+   }
+   
+   OpcodeExtractor FromV(OpcodeExtractor extractor)
    {
       return [&](Opcode opcode)
       {
          return machine.V[extractor(opcode)];
+      };
+   }
+    
+   Extractor FromV(size_t index)
+   {
+      return [&]()
+      {
+         return machine.V[index];
+      };
+   }
+   
+   template<typename T> 
+   Extractor From(T Machine::*attribute)
+   {
+      return [&]()
+      {
+         return machine.*attribute;
+      };
+   }
+
+
+   template<size_t S>
+   OpcodeRunner withMask(Opcode mask, Opcodes<S> runners)
+   {
+      return [&](Opcode opcode)
+      {
+         auto instruction = opcode & mask;
+         runners[instruction](opcode);
       };
    }
 
@@ -167,6 +287,15 @@ public:
       };
    }
 
+   OpcodeRunner jumpTo(Extractor extractor, OpcodeExtractor opcodeExtractor)
+   {
+      return [&](Opcode opcode)
+      {
+         machine.setProgramCounter(extractor() + opcodeExtractor(opcode));   
+      };
+   }
+
+
    OpcodeRunner callTo(OpcodeExtractor extractor)
    {
       return [&](Opcode opcode)
@@ -180,46 +309,129 @@ public:
          machine.setProgramCounter(extractor(opcode));     
       };
    }
-
-   void loadGame(const std::string& name)
+   
+   OpcodeExtractor randomAnd(OpcodeExtractor opcodeExtractor)
    {
-      std::ifstream file(name, std::ios::binary);
-      if (file.is_open())
+      return [&](Opcode opcode)
       {
-         // Put the cursor at the beginning
-         file.seekg(0, std::ios::beg);
-         file.read(reinterpret_cast<char*>(machine.getMemory()), machine.getMemorySize());
-         file.close();
-      }
-   }
-   
-  
-   void emulateCycle()
-   {
-      Opcode opcode = machine.fetchOpcode();
-      auto mask = opcode & 0xF000;
-      opcodes[mask];
-      std::cout << opcode << std::endl;
-   }
-   
-   void setKeys()
-   {
+         //TODO: add the random and the AND operation
+         return opcodeExtractor(opcode);
+      };
    }
 
-
-private:
-
-   Machine machine;
-   
-   OpcodeExtractor Vx;
-   OpcodeExtractor Vy;
-
-   std::array<OpcodeRunner, 35> opcodes;
-    
-   void skipInstruction()
+   OpcodeRunner setToV(OpcodeExtractor lhs, OpcodeExtractor rhs)
    {
+      return [&](Opcode opcode)
+      {
+         machine.V[lhs(opcode)] = rhs(opcode);
+      };
    }
  
+   OpcodeRunner setToV(OpcodeExtractor lhs, Extractor rhs)
+   {
+      return [&](Opcode opcode)
+      {
+         machine.V[lhs(opcode)] = rhs();
+      };
+   }
+ 
+   OpcodeRunner addToV(OpcodeExtractor lhs, OpcodeExtractor rhs)
+   {
+      return [&](Opcode opcode)
+      {
+         machine.V[lhs(opcode)] += rhs(opcode);
+      };
+   }
+  
+   OpcodeRunner addToI(OpcodeExtractor valueExtractor)
+   {
+      return [&](Opcode opcode)
+      {
+         machine.I += valueExtractor(opcode);
+      };
+   }
+ 
+   OpcodeRunner subtractToV(OpcodeExtractor lhs, OpcodeExtractor rhs)
+   {
+      return [&](Opcode opcode)
+      {
+         machine.V[lhs(opcode)] -= rhs(opcode);
+      };
+   }
+  
+   OpcodeRunner orToV(OpcodeExtractor lhs, OpcodeExtractor rhs)
+   {
+      return [&](Opcode opcode)
+      {
+         machine.V[lhs(opcode)] or_eq rhs(opcode);
+      };
+   }
+
+   OpcodeRunner andToV(OpcodeExtractor lhs, OpcodeExtractor rhs)
+   {
+      return [&](Opcode opcode)
+      {
+         machine.V[lhs(opcode)] and_eq rhs(opcode);
+      };
+   }
+
+
+   OpcodeRunner xorToV(OpcodeExtractor lhs, OpcodeExtractor rhs)
+   {
+      return [&](Opcode opcode)
+      {
+         machine.V[lhs(opcode)] xor_eq rhs(opcode);
+      };
+   }
+
+   OpcodeRunner shiftRightToV(OpcodeExtractor lhs, OpcodeExtractor rhs)
+   {
+      return [&](Opcode opcode)
+      {
+         //TODO
+      };
+   }
+
+   OpcodeRunner subtractNumericToV(OpcodeExtractor lhs, OpcodeExtractor rhs)
+   {
+      return [&](Opcode opcode)
+      {
+         //TODO
+      };
+   }
+
+   OpcodeRunner shiftLeftToV(OpcodeExtractor lhs, OpcodeExtractor rhs)
+   {
+      return [&](Opcode opcode)
+      {
+         //TODO
+      };
+   }
+
+   OpcodeRunner display(OpcodeExtractor VxEtractor, OpcodeExtractor VyExtractor, OpcodeExtractor nExtractor)
+   {
+      return [&](Opcode opcode)
+      {
+         //TODO
+      };
+   }
+   
+   OpcodeRunner skipIfPressed(OpcodeExtractor)
+   {
+      return [&](Opcode opcode)
+      {
+         //TODO
+      };
+   }
+
+   OpcodeRunner skipIfNotPressed(OpcodeExtractor)
+   {
+      return [&](Opcode opcode)
+      {
+         //TODO
+      };
+   }
+
 
 };
 
