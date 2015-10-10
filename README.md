@@ -3,7 +3,8 @@ C++ Chip8 emulator implementation with a Pimpl and a "funcionalish" approach.
 
 The purpose is to have a clear SDL to define the opcodes:
 
-,opcodeRunners{{
+```cpp
+,opcodes{{
       nop, 
       jumpTo(nnn), 
       callTo(nnn),
@@ -11,6 +12,7 @@ The purpose is to have a clear SDL to define the opcodes:
       skipIfNotEquals(Vx, kk),
       skipIfEquals(Vx, Vy),
 }}
+```
 
 Motivation taken from:
 http://www.multigesture.net/articles/how-to-write-an-emulator-chip-8-interpreter/
