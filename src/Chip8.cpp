@@ -126,7 +126,7 @@ namespace
    {
       return opcode & 0X00F0;
    }
-
+   
    Register keyPressed()
    {
       //TODO: Wait for a key to be pressed and return the value
@@ -143,11 +143,13 @@ public:
    ,Vx(FromV(&x)) // alias
    ,Vy(FromV(&y)) // alias
    ,V0(FromV(0))  // alias
-   ,delayTimer(From(&Machine::delayTimer)) // alias
-   ,soundTimer(From(&Machine::soundTimer)) // alias
    ,runner(withMask(0xF000, Opcodes<35>
    {{
-      nop, 
+      //TODO: They are not consecutive
+      withMask(0x0FFF, Opcodes<2>{{
+         clearDisplay(),
+         returnFromSubroutine(),
+      }}), 
       jumpTo(nnn), 
       callTo(nnn),
       skipIfEquals(Vx, kk),
@@ -167,18 +169,26 @@ public:
          shiftLeftToV(x, Vy),
       }}),
       skipIfNotEquals(Vx, Vy),
-      addToI(nnn),
+      addTo(&Machine::I, nnn),
       jumpTo(V0, nnn),
       setToV(x, randomAnd(kk)),
       display(Vx, Vy, n),
+      //TODO: They are not consecutive
       withMask(0x0FF, Opcodes<2>{{
          skipIfPressed(Vx), 
          skipIfNotPressed(Vx), 
       }}),
+      //TODO: They are not consecutive
       withMask(0x0FF, Opcodes<9>{{
-         setToV(x, delayTimer),
+         setToV(x, From(&Machine::delayTimer)),
          setToV(x, keyPressed),
-         nop, nop, nop, nop, nop, nop, nop,
+         setTo(&Machine::delayTimer, Vx),
+         setTo(&Machine::soundTimer, Vx),
+         addTo(&Machine::I, Vx),
+         setToF(Vx),
+         setToB(Vx),
+         storeToMemory(V0, Vx),
+         readFromMemory(V0, Vx),
       }}),
       nop, nop, nop, nop, 
       nop, nop, nop, nop, nop, 
@@ -218,15 +228,9 @@ private:
    OpcodeExtractor Vx;
    OpcodeExtractor Vy;
    Extractor V0;
-   Extractor delayTimer;
-   Extractor soundTimer;
 
    OpcodeRunner runner;
     
-   void skipInstruction()
-   {
-   }
-   
    OpcodeExtractor FromV(OpcodeExtractor extractor)
    {
       return [&](Opcode opcode)
@@ -251,8 +255,7 @@ private:
          return machine.*attribute;
       };
    }
-
-
+ 
    template<size_t S>
    OpcodeRunner withMask(Opcode mask, Opcodes<S> runners)
    {
@@ -260,6 +263,52 @@ private:
       {
          auto instruction = opcode & mask;
          runners[instruction](opcode);
+      };
+   }
+   
+   OpcodeRunner clearDisplay()
+   {
+      return [&](Opcode opcode)
+      {
+      };
+   }
+ 
+   OpcodeRunner returnFromSubroutine()
+   {
+      return [&](Opcode opcode)
+      {
+      };
+   }
+
+   OpcodeRunner setToF(OpcodeExtractor)
+   {
+      return [&](Opcode opcode)
+      {
+         //TODO
+      };
+   }
+
+   OpcodeRunner setToB(OpcodeExtractor)
+   {
+      return [&](Opcode opcode)
+      {
+         //TODO
+      };
+   }
+
+   OpcodeRunner storeToMemory(Extractor, OpcodeExtractor)
+   {
+      return [&](Opcode opcode)
+      {
+         //TODO
+      };
+   }
+
+   OpcodeRunner readFromMemory(Extractor, OpcodeExtractor)
+   {
+      return [&](Opcode opcode)
+      {
+         //TODO
       };
    }
 
@@ -318,6 +367,15 @@ private:
          return opcodeExtractor(opcode);
       };
    }
+   
+   template<typename T>
+   OpcodeRunner setTo(T Machine::*attribute, OpcodeExtractor opcodeExtractor)
+   {
+      return [&](Opcode opcode)
+      {
+         machine.*attribute = opcodeExtractor(opcode);
+      };
+   }
 
    OpcodeRunner setToV(OpcodeExtractor lhs, OpcodeExtractor rhs)
    {
@@ -334,7 +392,16 @@ private:
          machine.V[lhs(opcode)] = rhs();
       };
    }
- 
+  
+   template <typename T>
+   OpcodeRunner addTo(T Machine::*attribute, OpcodeExtractor opcodeExtractor)
+   {
+      return [&](Opcode opcode)
+      {
+         machine.*attribute += opcodeExtractor(opcode);
+      };
+   }
+
    OpcodeRunner addToV(OpcodeExtractor lhs, OpcodeExtractor rhs)
    {
       return [&](Opcode opcode)
@@ -343,14 +410,6 @@ private:
       };
    }
   
-   OpcodeRunner addToI(OpcodeExtractor valueExtractor)
-   {
-      return [&](Opcode opcode)
-      {
-         machine.I += valueExtractor(opcode);
-      };
-   }
- 
    OpcodeRunner subtractToV(OpcodeExtractor lhs, OpcodeExtractor rhs)
    {
       return [&](Opcode opcode)
