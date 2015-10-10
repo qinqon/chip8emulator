@@ -2,7 +2,6 @@
 //#include   // OpenGL graphics and input
 #include "Chip8.h" // Your cpu core implementation
  
-Chip8 myChip8;
 
 void setupGraphics()
 {
@@ -23,7 +22,8 @@ int main(int argc, char **argv)
   setupInput();
  
   // Initialize the Chip8 system and load the game into the memory  
-  myChip8.initialize();
+  Chip8 myChip8;
+  
   myChip8.loadGame("pong");
  
   // Emulation loop

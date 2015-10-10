@@ -1,13 +1,17 @@
-all: chip8emulator
+CC=g++
+CFLAGS=-c -Wall -std=c++11 -Werror -pedantic
+LDFLAGS=
+SOURCES=$(wildcard src/*.cpp)
+OBJECTS=$(SOURCES:.cpp=.o)
+EXECUTABLE=chip8emulator
 
-chip8emulator: src/main.o src/Chip8.o
-	    g++ src/main.o src/Chip8.o -o chip8emulator.bin
+all: $(SOURCES) $(EXECUTABLE)
 
-Chip8.o: src/Chip8.cpp
-	    g++ -c src/Chip8.cpp
+$(EXECUTABLE): $(OBJECTS)
+	$(CC) $(LDFLAGS) $(OBJECTS) -o $@
 
-main.o: src/main.cpp
-	    g++ -c src/main.cpp
+.cpp.o:
+	$(CC) $(CFLAGS) $< -o $@		
 
 clean:
-	    rm src/*o chip8emulator.bin
+	    rm src/*o $(EXECUTABLE)

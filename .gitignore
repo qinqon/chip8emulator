@@ -27,6 +27,7 @@
 *.out
 *.app
 *.bin
+chip8emulator
 
 # vim
- *.sw*
+.*.sw*
