@@ -11,4 +11,12 @@ using Counter = unsigned short;
 
 // The Chip 8 has 4K memory in total
 using Memory = std::array<Register, 4096>;
+
+// We don't need std::stack,  it uses dynamic memory;
+using Stack = std::array<Counter, 16>;
+
+// CPU registers: named V0,V1 up 
+// to VE. The 16th register is used  for the ‘carry flag’.
+using Registers = std::array<Register, 16>;
+
 #endif // _CHIP8TYPES_HH_
