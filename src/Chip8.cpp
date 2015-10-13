@@ -102,6 +102,18 @@ namespace
    template<size_t S>
    using Opcodes           = std::array<OpcodeRunner, S>;
    using Mapping           = std::unordered_map<Register, OpcodeRunner>;
+   
+   Register lsb(Register value)
+   {
+      auto mask = ~(std::numeric_limits<Register>::max() - 1);
+      return value & mask;
+   }
+   
+   Register msb(Register value)
+   {
+      auto bits = std::numeric_limits<Register>::digits - 1;
+      return bits >> value;
+   }
 
    Register nnn(Opcode opcode)
    {
@@ -127,10 +139,12 @@ namespace
       return opcode & 0x00F0;
    }
    
+   // Wait for a key to be pressed and return the value
    Register keyPressed()
    {
-      //TODO: Wait for a key to be pressed and return the value
-      return 0;
+      Register key{};
+      std::cin >> key;
+      return key;
    }
 
 }
@@ -166,9 +180,9 @@ public:
             xorToV(x, Vy),  
             addToV(x, Vy),
             subtractToV(x, Vy), 
-            shiftRightToV(x, Vy), 
-            subtractNumericToV(x, Vy), 
-            shiftLeftToV(x, Vy),
+            shiftRightToVx(), 
+            subtractNumericToVxVy(), 
+            shiftLeftToVx(),
       }}),
       skipIfNotEquals(Vx, Vy),
       addTo(&Machine::I, nnn),
@@ -177,8 +191,8 @@ public:
       display(Vx, Vy, n),
       withMask(0x0FF, 
          Mapping{
-            {0x009E, skipIfPressed(Vx)},
-            {0x00A1, skipIfNotPressed(Vx)}
+            {0x009E, skipIfPressedVx()},
+            {0x00A1, skipIfNotPressedVx()}
          }), 
       withMask(0x0FF, 
          Mapping{
@@ -366,6 +380,11 @@ private:
       };
    }
    
+   /*   
+   Set Vx = random byte AND kk.
+
+   The interpreter generates a random number from 0 to 255, which is then ANDed with the value kk. The results are stored in Vx. See instruction 8xy2 for more information on AND.
+   */
    OpcodeExtractor randomAnd(OpcodeExtractor opcodeExtractor)
    {
       return [&](Opcode opcode)
@@ -449,28 +468,46 @@ private:
          machine.V[lhs(opcode)] xor_eq rhs(opcode);
       };
    }
-
-   OpcodeRunner shiftRightToV(OpcodeExtractor lhs, OpcodeExtractor rhs)
+   // If the least-significant bit of Vx is 1, then VF is set to 1, otherwise 0. 
+   // Then Vx is divided by 2.
+   OpcodeRunner shiftRightToVx()
    {
       return [&](Opcode opcode)
       {
-         //TODO
+         auto x = ::x(opcode);
+         auto Vx = machine.V[x];
+         machine.V[0xF] = ((lsb(Vx) == 1) ? 1 : 0);
+         machine.V[x] /= 2;
       };
    }
 
-   OpcodeRunner subtractNumericToV(OpcodeExtractor lhs, OpcodeExtractor rhs)
+   // Set Vx = Vy - Vx, set VF = NOT borrow.
+   // If Vy > Vx, then VF is set to 1, otherwise 0. Then Vx is subtracted from Vy, and the results stored in Vx.
+   OpcodeRunner subtractNumericToVxVy()
    {
       return [&](Opcode opcode)
       {
-         //TODO
+         auto x = ::x(opcode);
+         auto y = ::y(opcode);
+         auto Vx = machine.V[x];
+         auto Vy = machine.V[y];
+         
+         machine.V[0xF] = ((Vy > Vx) ? 1 : 0);
+         machine.V[x] -= Vy;
       };
    }
 
-   OpcodeRunner shiftLeftToV(OpcodeExtractor lhs, OpcodeExtractor rhs)
+   // Set Vx = Vx SHL 1.
+   // If the most-significant bit of Vx is 1, then VF is set to 1, otherwise to 0. 
+   // Then Vx is multiplied by 2.
+   OpcodeRunner shiftLeftToVx()
    {
       return [&](Opcode opcode)
       {
-         //TODO
+         auto x = ::x(opcode);
+         auto Vx = machine.V[x];
+         machine.V[0xF] = ((msb(Vx) == 1) ? 1 : 0);
+         machine.V[x] *= 2;
       };
    }
 
@@ -482,19 +519,31 @@ private:
       };
    }
    
-   OpcodeRunner skipIfPressed(OpcodeExtractor)
+   // Skip next instruction if key with the value of Vx is pressed.
+   // Checks the keyboard, and if the key corresponding to the value of Vx is currently in the down position, PC is increased by 2.
+   OpcodeRunner skipIfPressedVx()
    {
       return [&](Opcode opcode)
       {
-         //TODO
+         auto Vx = machine.V[::x(opcode)];
+         if (Vx == keyPressed())
+         {
+            machine.skip();
+         }
       };
    }
 
-   OpcodeRunner skipIfNotPressed(OpcodeExtractor)
+   // Skip next instruction if key with the value of Vx is not pressed.
+   // Checks the keyboard, and if the key corresponding to the value of Vx is currently in the up position, PC is increased by 2.
+   OpcodeRunner skipIfNotPressedVx()
    {
       return [&](Opcode opcode)
       {
-         //TODO
+         auto Vx = machine.V[::x(opcode)];
+         if (Vx != keyPressed())
+         {
+            machine.skip();
+         }
       };
    }
 
