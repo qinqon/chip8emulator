@@ -21,4 +21,10 @@ using Stack = std::array<Counter, 16>;
 // to VE. The 16th register is used  for the ‘carry flag’.
 using Registers = std::array<Register, 16>;
 
+
+//The graphics of the Chip 8 are black and white and the screen has a total of 2048 pixels (64 x 32).
+const size_t ScreenXLimit = 64;
+const size_t ScreenYLimit = 32;
+using Graphics = std::array<Register, ScreenXLimit * ScreenYLimit>;
+
 #endif // _CHIP8TYPES_HH_

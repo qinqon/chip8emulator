@@ -1,5 +1,9 @@
 #include "Chip8.h"
 
+#include <cstdio>
+#include <unistd.h>
+#include <termios.h>
+
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -30,7 +34,7 @@ namespace
       0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
       0xF0, 0x80, 0xF0, 0x80, 0x80  // F
    }};
-   
+
    class Machine
    {
     public:
@@ -39,11 +43,12 @@ namespace
       ,I(0)
       ,delayTimer(0)
       ,soundTimer(0)
-      ,pc(0)
+      ,pc(0x200) // At the old systems the emulator is at the beginning
       {
-         clearMemory();
+         clear(memory);
+         clear(graphics);
       }
-     
+      
       Opcode fetchOpcode()
       {
          return memory[pc] << 8 | memory[pc + 1];
@@ -80,19 +85,20 @@ namespace
       Counter I;
       Timer delayTimer;
       Timer soundTimer;
+      Graphics graphics;
    private:
  
       Memory memory;
       Counter pc;
-
-      void clearMemory()
-      { 
-         for(size_t i{}; i < chip8_fontset.size() ; i++)
+      
+      template<typename T, size_t S>
+      void clear(std::array<T, S>& data)
+      {
+         for(size_t i = 0; i < S; i++)
          {
-            memory[i] = chip8_fontset[i];		
+            data[i] = chip8_fontset[i & chip8_fontset.size()];
          }
       }
-
    };
 
    // We are going to capture with the lambda so we need a std::function
@@ -112,7 +118,7 @@ namespace
    Register msb(Register value)
    {
       auto bits = std::numeric_limits<Register>::digits - 1;
-      return bits >> value;
+      return value >> bits;
    }
 
    Register nnn(Opcode opcode)
@@ -131,20 +137,34 @@ namespace
 
    Register x(Opcode opcode)
    {
-      return opcode & 0x0F00;
+      return (opcode & 0x0F00) >> 8;
    }
 
    Register y(Opcode opcode)
    {
-      return opcode & 0x00F0;
+      return (opcode & 0x00F0) >> 4;
    }
    
    // Wait for a key to be pressed and return the value
    Register keyPressed()
    {
-      Register key{};
-      std::cin >> key;
-      return key;
+      Register buf = 0;
+      struct termios old = {0};
+      if (tcgetattr(0, &old) < 0)
+         perror("tcsetattr()");
+      old.c_lflag &= ~ICANON;
+      old.c_lflag &= ~ECHO;
+      old.c_cc[VMIN] = 1;
+      old.c_cc[VTIME] = 0;
+      if (tcsetattr(0, TCSANOW, &old) < 0)
+         perror("tcsetattr ICANON");
+      if (read(0, &buf, 1) < 0)
+         perror ("read()");
+      old.c_lflag |= ICANON;
+      old.c_lflag |= ECHO;
+      if (tcsetattr(0, TCSADRAIN, &old) < 0)
+         perror ("tcsetattr ~ICANON");
+      return (buf);
    }
 
 }
@@ -157,7 +177,8 @@ public:
    ,Vx(FromV(&x)) // alias
    ,Vy(FromV(&y)) // alias
    ,V0(FromV(0))  // alias
-   ,runner(withMask(0xF000, Opcodes<26>
+   ,drawFlag(false)
+   ,runner(withMask(0xF000, 12, Opcodes<26>
    {{
       withMask(0x00FF, 
          Mapping{
@@ -185,7 +206,7 @@ public:
             shiftLeftToVx(),
       }}),
       skipIfNotEquals(Vx, Vy),
-      addTo(&Machine::I, nnn),
+      setTo(&Machine::I, nnn),
       jumpTo(V0, nnn),
       setToV(x, randomAnd(kk)),
       display(Vx, Vy, n),
@@ -214,9 +235,12 @@ public:
       std::ifstream file(name, std::ios::binary);
       if (file.is_open())
       {
-         // Put the cursor at the beginning
-         file.seekg(0, std::ios::beg);
-         file.read(reinterpret_cast<char*>(machine.getMemory()), machine.getMemorySize());
+         auto begin = std::istreambuf_iterator<char>(file);
+         auto end = std::istreambuf_iterator<char>();
+         
+         // The game has to be loaded after the the poss 0x200
+         std::copy(begin, end, &machine.getMemory()[0x200]);
+
          file.close();
       }
    }
@@ -226,13 +250,22 @@ public:
    {
       Opcode opcode = machine.fetchOpcode();
       runner(opcode);
-      std::cout << opcode << std::endl;
    }
    
    void setKeys()
    {
+      //TODO:
+   }
+   
+   bool draw()
+   {
+      return drawFlag;
    }
 
+   const Graphics& getGraphics() const
+   {
+      return machine.graphics;
+   }
 
 private:
 
@@ -240,12 +273,13 @@ private:
    OpcodeExtractor Vx;
    OpcodeExtractor Vy;
    Extractor V0;
-
+   bool drawFlag;
+   
    OpcodeRunner runner;
-    
+
    OpcodeExtractor FromV(OpcodeExtractor extractor)
    {
-      return [&](Opcode opcode)
+      return [extractor, this](Opcode opcode)
       {
          return machine.V[extractor(opcode)];
       };
@@ -253,7 +287,7 @@ private:
     
    Extractor FromV(size_t index)
    {
-      return [&]()
+      return [index, this]()
       {
          return machine.V[index];
       };
@@ -262,48 +296,59 @@ private:
    template<typename T> 
    Extractor From(T Machine::*attribute)
    {
-      return [&]()
+      return [attribute, this]()
       {
          return machine.*attribute;
       };
    }
-  
+ 
    template<size_t S>
    OpcodeRunner withMask(Opcode mask, Opcodes<S> runners)
    {
-      return [&](Opcode opcode)
+      return withMask(mask, 0 /*no shift*/, runners);
+   }
+   
+   template<size_t S>
+   OpcodeRunner withMask(Opcode mask, size_t shift, Opcodes<S> runners)
+   {
+      return [=](Opcode opcode)
       {
-         auto instruction = opcode & mask;
-         runners[instruction](opcode);
+         auto instruction = (opcode & mask) >> shift;
+         auto& runner = runners.at(instruction);
+         runner(opcode);
       };
    }
 
    OpcodeRunner withMask(Opcode mask, Mapping runners)
    {
-      return [&](Opcode opcode)
+      return [=](Opcode opcode)
       {
          auto instruction = opcode & mask;
-         runners.at(instruction)(opcode);
+         auto& runner = runners.at(instruction);
+         runner(opcode);
       };
    }
-   
+ 
    OpcodeRunner clearDisplay()
    {
-      return [&](Opcode opcode)
+      return [this](Opcode opcode)
       {
+         drawFlag = true;
+         //TODO:
       };
    }
  
    OpcodeRunner returnFromSubroutine()
    {
-      return [&](Opcode opcode)
+      return [this](Opcode opcode)
       {
+         //TODO:
       };
    }
 
    OpcodeRunner setToF(OpcodeExtractor)
    {
-      return [&](Opcode opcode)
+      return [this](Opcode opcode)
       {
          //TODO
       };
@@ -311,7 +356,7 @@ private:
 
    OpcodeRunner setToB(OpcodeExtractor)
    {
-      return [&](Opcode opcode)
+      return [this](Opcode opcode)
       {
          //TODO
       };
@@ -319,7 +364,7 @@ private:
 
    OpcodeRunner storeToMemory(Extractor, OpcodeExtractor)
    {
-      return [&](Opcode opcode)
+      return [this](Opcode opcode)
       {
          //TODO
       };
@@ -327,7 +372,7 @@ private:
 
    OpcodeRunner readFromMemory(Extractor, OpcodeExtractor)
    {
-      return [&](Opcode opcode)
+      return [this](Opcode opcode)
       {
          //TODO
       };
@@ -335,7 +380,7 @@ private:
 
    OpcodeRunner skipIfEquals(OpcodeExtractor lhs, OpcodeExtractor rhs)
    {
-      return [&](Opcode opcode)
+      return [lhs, rhs, this](Opcode opcode)
       {
          if (lhs(opcode) == rhs(opcode)) machine.skip();
       };
@@ -343,7 +388,7 @@ private:
    
    OpcodeRunner skipIfNotEquals(OpcodeExtractor lhs, OpcodeExtractor rhs)
    {
-      return [&](Opcode opcode)
+      return [lhs, rhs, this](Opcode opcode)
       {
          if (lhs(opcode) != rhs(opcode)) machine.skip();
       };
@@ -351,7 +396,7 @@ private:
 
    OpcodeRunner jumpTo(OpcodeExtractor extractor)
    {
-      return [&](Opcode opcode)
+      return [extractor, this](Opcode opcode)
       {
          machine.setProgramCounter(extractor(opcode));   
       };
@@ -359,7 +404,7 @@ private:
 
    OpcodeRunner jumpTo(Extractor extractor, OpcodeExtractor opcodeExtractor)
    {
-      return [&](Opcode opcode)
+      return [extractor, opcodeExtractor, this](Opcode opcode)
       {
          machine.setProgramCounter(extractor() + opcodeExtractor(opcode));   
       };
@@ -368,10 +413,9 @@ private:
 
    OpcodeRunner callTo(OpcodeExtractor extractor)
    {
-      return [&](Opcode opcode)
+      return [extractor, this](Opcode opcode)
       {
-         // Increment stack pointer
-         ++ machine.sp;
+         machine.skip();
          
          // Puts the program counter on the top of the stack
          machine.stack[0] = machine.getProgramCounter();
@@ -387,7 +431,7 @@ private:
    */
    OpcodeExtractor randomAnd(OpcodeExtractor opcodeExtractor)
    {
-      return [&](Opcode opcode)
+      return [opcodeExtractor, this](Opcode opcode)
       {
          //TODO: add the random and the AND operation
          return opcodeExtractor(opcode);
@@ -397,7 +441,7 @@ private:
    template<typename T>
    OpcodeRunner setTo(T Machine::*attribute, OpcodeExtractor opcodeExtractor)
    {
-      return [&](Opcode opcode)
+      return [attribute, opcodeExtractor, this](Opcode opcode)
       {
          machine.*attribute = opcodeExtractor(opcode);
       };
@@ -405,7 +449,7 @@ private:
 
    OpcodeRunner setToV(OpcodeExtractor lhs, OpcodeExtractor rhs)
    {
-      return [&](Opcode opcode)
+      return [lhs, rhs, this](Opcode opcode)
       {
          machine.V[lhs(opcode)] = rhs(opcode);
       };
@@ -413,7 +457,7 @@ private:
  
    OpcodeRunner setToV(OpcodeExtractor lhs, Extractor rhs)
    {
-      return [&](Opcode opcode)
+      return [lhs, rhs, this](Opcode opcode)
       {
          machine.V[lhs(opcode)] = rhs();
       };
@@ -422,7 +466,7 @@ private:
    template <typename T>
    OpcodeRunner addTo(T Machine::*attribute, OpcodeExtractor opcodeExtractor)
    {
-      return [&](Opcode opcode)
+      return [attribute, opcodeExtractor, this](Opcode opcode)
       {
          machine.*attribute += opcodeExtractor(opcode);
       };
@@ -430,7 +474,7 @@ private:
 
    OpcodeRunner addToV(OpcodeExtractor lhs, OpcodeExtractor rhs)
    {
-      return [&](Opcode opcode)
+      return [lhs, rhs, this](Opcode opcode)
       {
          machine.V[lhs(opcode)] += rhs(opcode);
       };
@@ -438,7 +482,7 @@ private:
   
    OpcodeRunner subtractToV(OpcodeExtractor lhs, OpcodeExtractor rhs)
    {
-      return [&](Opcode opcode)
+      return [lhs, rhs, this](Opcode opcode)
       {
          machine.V[lhs(opcode)] -= rhs(opcode);
       };
@@ -446,7 +490,7 @@ private:
   
    OpcodeRunner orToV(OpcodeExtractor lhs, OpcodeExtractor rhs)
    {
-      return [&](Opcode opcode)
+      return [lhs, rhs, this](Opcode opcode)
       {
          machine.V[lhs(opcode)] or_eq rhs(opcode);
       };
@@ -454,7 +498,7 @@ private:
 
    OpcodeRunner andToV(OpcodeExtractor lhs, OpcodeExtractor rhs)
    {
-      return [&](Opcode opcode)
+      return [lhs, rhs, this](Opcode opcode)
       {
          machine.V[lhs(opcode)] and_eq rhs(opcode);
       };
@@ -463,7 +507,7 @@ private:
 
    OpcodeRunner xorToV(OpcodeExtractor lhs, OpcodeExtractor rhs)
    {
-      return [&](Opcode opcode)
+      return [lhs, rhs, this](Opcode opcode)
       {
          machine.V[lhs(opcode)] xor_eq rhs(opcode);
       };
@@ -513,9 +557,33 @@ private:
 
    OpcodeRunner display(OpcodeExtractor VxEtractor, OpcodeExtractor VyExtractor, OpcodeExtractor nExtractor)
    {
-      return [&](Opcode opcode)
+      return [VxEtractor, VyExtractor, nExtractor, this](Opcode opcode)
       {
-         //TODO
+
+         auto x = VxEtractor(opcode);
+         auto y = VyExtractor(opcode);
+         auto height = nExtractor(opcode);
+         machine.V[0xF] = 0;
+         for (int yoffset = 0; yoffset < height; yoffset ++)
+         {
+            auto pixel = machine.getMemory()[machine.I + yoffset];
+            for(int xoffset = 0; xoffset < 8; xoffset ++)
+            {  
+               auto xoffset_mask = 0x80 >> xoffset;
+               if((pixel & xoffset_mask) != 0)
+               {
+                  auto graphic_index = x + xoffset + ((y + yoffset) * 64);
+                  auto previous_value = machine.graphics[graphic_index];
+                  if(previous_value == 1)
+                  {
+                     machine.V[0xF] = 1;                                 
+                  }
+                  machine.graphics[graphic_index] = previous_value ^ 1;
+               }
+            }
+         }
+         drawFlag = true;
+         machine.skip();
       };
    }
    
@@ -574,6 +642,14 @@ Chip8::setKeys()
    pimpl->setKeys();
 }
 
+bool
+Chip8::draw()
+{
+   return pimpl->draw();
+}
 
-
-
+const Graphics&
+Chip8::getGraphics() const
+{
+   return pimpl->getGraphics();
+}

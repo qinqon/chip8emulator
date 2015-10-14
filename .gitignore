@@ -31,3 +31,6 @@ chip8emulator
 
 # vim
 .*.sw*
+
+# OSX
+.DS_Store

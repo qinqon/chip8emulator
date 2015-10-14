@@ -3,6 +3,8 @@
 
 #include <string>
 
+#include "Chip8Types.h"
+
 class Chip8
 {
 public:
@@ -11,7 +13,8 @@ public:
    void loadGame(const std::string& name);
    void emulateCycle();
    void setKeys();
-   bool drawFlag;
+   bool draw();
+   const Graphics& getGraphics() const;
 private:
    class Pimpl;
    std::unique_ptr<Pimpl> pimpl;
