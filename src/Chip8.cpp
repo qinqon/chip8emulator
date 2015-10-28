@@ -16,7 +16,6 @@
 namespace
 {
 
-   /*
    std::array<unsigned char, 80> chip8_fontset ={
    { 
       0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -36,7 +35,6 @@ namespace
       0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
       0xF0, 0x80, 0xF0, 0x80, 0x80  // F
    }};
-   */
 
    class Machine
    {
@@ -46,11 +44,16 @@ namespace
       ,I(0xFFFF)
       ,delayTimer(0)
       ,soundTimer(0)
-      ,pc(0x200) // At the old systems the emulator is at the beginning
+      // At the old systems the emulator is at the beginning
+      ,pc(0x200)
       {
+         
+         clear(stack);
          clear(memory);
          clear(graphics);
          clear(V);
+
+         loadFonset();  
       }
       
       Opcode fetchOpcode()
@@ -70,7 +73,7 @@ namespace
       
       void setProgramCounter(Counter counter)
       {
-         pc = counter;
+         pc = counter;       
       }
       
       Counter getProgramCounter()
@@ -96,14 +99,22 @@ namespace
       Counter pc;
       
       template<typename T, size_t S>
-      void clear(std::array<T, S>& data)
+      void clear(std::array<T, S>& output)
       {
          for(size_t i = 0; i < S; i++)
          {
-            //data[i] = chip8_fontset[i & chip8_fontset.size()];
-            data[i] = 0xFF;
+            output[i] = 0xFF;
          }
       }
+
+      void loadFonset()
+      {
+         for (auto i = 0; i < chip8_fontset.size(); ++i)
+         {
+            memory[i] = chip8_fontset[i]; 
+         }
+      }
+
    };
 
    // We are going to capture with the lambda so we need a std::function
@@ -403,11 +414,12 @@ private:
       };
    }
 
-   OpcodeRunner jumpTo(OpcodeExtractor extractor)
+   OpcodeRunner jumpTo(OpcodeExtractor pcExtractor)
    {
-      return [extractor, this](Opcode opcode)
+      return [pcExtractor, this](Opcode opcode)
       {
-         machine.setProgramCounter(extractor(opcode));   
+         auto pc = pcExtractor(opcode);
+         machine.setProgramCounter(pc);   
       };
    }
 
