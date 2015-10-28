@@ -1,6 +1,7 @@
 #include "Chip8.h"
 
 #include <cstdio>
+#include <random>
 #include <unistd.h>
 #include <termios.h>
 
@@ -15,6 +16,7 @@
 namespace
 {
 
+   /*
    std::array<unsigned char, 80> chip8_fontset ={
    { 
       0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -34,19 +36,21 @@ namespace
       0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
       0xF0, 0x80, 0xF0, 0x80, 0x80  // F
    }};
+   */
 
    class Machine
    {
     public:
       Machine()
       :sp(0)
-      ,I(0)
+      ,I(0xFFFF)
       ,delayTimer(0)
       ,soundTimer(0)
       ,pc(0x200) // At the old systems the emulator is at the beginning
       {
          clear(memory);
          clear(graphics);
+         clear(V);
       }
       
       Opcode fetchOpcode()
@@ -78,7 +82,7 @@ namespace
       {
          pc += 2;
       }
-   
+      std::random_device rd;
       Stack::size_type sp;
       Stack stack;
       Registers V;
@@ -96,14 +100,15 @@ namespace
       {
          for(size_t i = 0; i < S; i++)
          {
-            data[i] = chip8_fontset[i & chip8_fontset.size()];
+            //data[i] = chip8_fontset[i & chip8_fontset.size()];
+            data[i] = 0xFF;
          }
       }
    };
 
    // We are going to capture with the lambda so we need a std::function
    using OpcodeRunner      = std::function<void(Opcode)>;
-   using OpcodeExtractor   = std::function<Register(Opcode)>;
+   using OpcodeExtractor   = std::function<Opcode(Opcode)>;
    using Extractor         = std::function<Register()>;
    template<size_t S>
    using Opcodes           = std::array<OpcodeRunner, S>;
@@ -121,26 +126,26 @@ namespace
       return value >> bits;
    }
 
-   Register nnn(Opcode opcode)
+   Opcode nnn(Opcode opcode)
    {
       return opcode & 0x0FFF;
    }
-   Register kk(Opcode opcode)
+   Opcode kk(Opcode opcode)
    {
       return opcode & 0x00FF;
    }
     
-   Register n(Opcode opcode)
+   Opcode n(Opcode opcode)
    {
       return opcode & 0x000F;
    }
 
-   Register x(Opcode opcode)
+   Opcode x(Opcode opcode)
    {
       return (opcode & 0x0F00) >> 8;
    }
 
-   Register y(Opcode opcode)
+   Opcode y(Opcode opcode)
    {
       return (opcode & 0x00F0) >> 4;
    }
@@ -180,16 +185,18 @@ public:
    ,drawFlag(false)
    ,runner(withMask(0xF000, 12, Opcodes<26>
    {{
-      withMask(0x00FF, 
+     withMask(0x00FF, 
          Mapping{
             {0x00E0, clearDisplay()}, 
             {0x00EE, returnFromSubroutine()}
          }
       ), 
+      // 0x01
       jumpTo(nnn), 
       callTo(nnn),
       skipIfEquals(Vx, kk),
       skipIfNotEquals(Vx, kk),
+      // 0x05
       skipIfEquals(Vx, Vy),
       setToV(x, kk),
       addToV(x, kk),
@@ -206,6 +213,7 @@ public:
             shiftLeftToVx(),
       }}),
       skipIfNotEquals(Vx, Vy),
+      // 0x0A
       setTo(&Machine::I, nnn),
       jumpTo(V0, nnn),
       setToV(x, randomAnd(kk)),
@@ -250,6 +258,7 @@ public:
    {
       Opcode opcode = machine.fetchOpcode();
       runner(opcode);
+      machine.skip();
    }
    
    void setKeys()
@@ -429,12 +438,14 @@ private:
 
    The interpreter generates a random number from 0 to 255, which is then ANDed with the value kk. The results are stored in Vx. See instruction 8xy2 for more information on AND.
    */
-   OpcodeExtractor randomAnd(OpcodeExtractor opcodeExtractor)
+   OpcodeExtractor randomAnd(OpcodeExtractor rhsExtractor)
    {
-      return [opcodeExtractor, this](Opcode opcode)
+      return [rhsExtractor, this](Opcode opcode)
       {
-         //TODO: add the random and the AND operation
-         return opcodeExtractor(opcode);
+         auto rhs = rhsExtractor(opcode);
+         std::mt19937 mt(machine.rd());
+         std::uniform_int_distribution<>dist(0, 255);
+         return dist(mt) & rhs;
       };
    }
    
@@ -472,11 +483,14 @@ private:
       };
    }
 
-   OpcodeRunner addToV(OpcodeExtractor lhs, OpcodeExtractor rhs)
+   OpcodeRunner addToV(OpcodeExtractor lhsExtractor, OpcodeExtractor rhsExtractor)
    {
-      return [lhs, rhs, this](Opcode opcode)
+      return [lhsExtractor, rhsExtractor, this](Opcode opcode)
       {
-         machine.V[lhs(opcode)] += rhs(opcode);
+         auto lhs = lhsExtractor(opcode);
+         auto rhs = rhsExtractor(opcode);
+         auto V = machine.V[lhs];
+         machine.V[lhs] = V + rhs;
       };
    }
   
@@ -583,7 +597,6 @@ private:
             }
          }
          drawFlag = true;
-         machine.skip();
       };
    }
    

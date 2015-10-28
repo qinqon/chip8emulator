@@ -4,6 +4,9 @@
 // 16 bits are needed for the opcodes
 using Opcode = unsigned short;
 
+// We have 16 bits addresses
+using Address = unsigned short;
+
 // Chip 8 has 8 bits general purpose registers;
 using Register = unsigned char;
 
