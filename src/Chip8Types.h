@@ -2,17 +2,17 @@
 #define _CHIP8TYPES_HH_
 
 // 16 bits are needed for the opcodes
-using Opcode = unsigned short;
+using Opcode = uint16_t;
 
 // We have 16 bits addresses
-using Address = unsigned short;
+using Address = uint16_t;
 
 // Chip 8 has 8 bits general purpose registers;
-using Register = unsigned char;
+using Register = uint8_t;
 
-using Counter = unsigned short;
+using Counter = uint16_t;
 
-using Timer = unsigned char;
+using Timer = uint8_t;
 
 // The Chip 8 has 4K memory in total
 using Memory = std::array<Register, 4096>;

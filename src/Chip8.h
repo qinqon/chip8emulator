@@ -13,7 +13,7 @@ public:
    void loadGame(const std::string& name);
    void emulateCycle();
    void setKeys();
-   bool draw();
+   bool drawNeeded();
    const Graphics& getGraphics() const;
 private:
    class Pimpl;

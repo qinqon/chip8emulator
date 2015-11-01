@@ -13,9 +13,15 @@
 
 #include "Chip8Types.h"
 
+#ifdef DEBUG 
+#define D(runner) debugRunner(runner, #runner)
+#else
+#define D(runner) runner
+#endif 
+
 namespace
 {
-
+   
    std::array<unsigned char, 80> chip8_fontset ={
    { 
       0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -116,9 +122,11 @@ namespace
       }
 
    };
+   
+   enum class OpcodeRunnerResult { SkippNeeded, SkippNotNeeded };
 
    // We are going to capture with the lambda so we need a std::function
-   using OpcodeRunner      = std::function<void(Opcode)>;
+   using OpcodeRunner      = std::function<OpcodeRunnerResult(Opcode)>;
    using OpcodeExtractor   = std::function<Opcode(Opcode)>;
    using Extractor         = std::function<Register()>;
    template<size_t S>
@@ -196,22 +204,22 @@ public:
    ,drawFlag(false)
    ,runner(withMask(0xF000, 12, Opcodes<26>
    {{
-     withMask(0x00FF, 
+     D(withMask(0x00FF, 
          Mapping{
             {0x00E0, clearDisplay()}, 
             {0x00EE, returnFromSubroutine()}
          }
-      ), 
+      )), 
       // 0x01
-      jumpTo(nnn), 
-      callTo(nnn),
-      skipIfEquals(Vx, kk),
-      skipIfNotEquals(Vx, kk),
+      D(jumpTo(nnn)), 
+      D(callTo(nnn)),
+      D(skipIfEquals(Vx, kk)),
+      D(skipIfNotEquals(Vx, kk)),
       // 0x05
-      skipIfEquals(Vx, Vy),
-      setToV(x, kk),
-      addToV(x, kk),
-      withMask(0x000F, 
+      D(skipIfEquals(Vx, Vy)),
+      D(setToV(x, kk)),
+      D(addToV(x, kk)),
+      D(withMask(0x000F, 
          Opcodes<9>{{
             setToV(x, Vy),
             orToV(x, Vy), 
@@ -222,19 +230,19 @@ public:
             shiftRightToVx(), 
             subtractNumericToVxVy(), 
             shiftLeftToVx(),
-      }}),
-      skipIfNotEquals(Vx, Vy),
+      }})),
+      D(skipIfNotEquals(Vx, Vy)),
       // 0x0A
-      setTo(&Machine::I, nnn),
-      jumpTo(V0, nnn),
-      setToV(x, randomAnd(kk)),
-      display(Vx, Vy, n),
-      withMask(0x0FF, 
+      D(setTo(&Machine::I, nnn)),
+      D(jumpTo(V0, nnn)),
+      D(setToV(x, randomAnd(kk))),
+      D(display(Vx, Vy, n)),
+      D(withMask(0x0FF, 
          Mapping{
             {0x009E, skipIfPressedVx()},
             {0x00A1, skipIfNotPressedVx()}
-         }), 
-      withMask(0x0FF, 
+         })), 
+      D(withMask(0x0FF, 
          Mapping{
             {0x0007, setToV(x, From(&Machine::delayTimer))},
             {0x000A, setToV(x, keyPressed)},
@@ -245,7 +253,7 @@ public:
             {0x0033, setToB(Vx)},
             {0x0055, storeToMemory(V0, Vx)},
             {0x0065, readFromMemory(V0, Vx)},
-         }),
+         })),
    }}))
    {} 
 
@@ -268,8 +276,11 @@ public:
    void emulateCycle()
    {
       Opcode opcode = machine.fetchOpcode();
-      runner(opcode);
-      machine.skip();
+      auto result = runner(opcode);
+      if (result == OpcodeRunnerResult::SkippNeeded)
+      {
+         machine.skip();
+      }
    }
    
    void setKeys()
@@ -277,7 +288,7 @@ public:
       //TODO:
    }
    
-   bool draw()
+   bool drawNeeded()
    {
       return drawFlag;
    }
@@ -296,6 +307,7 @@ private:
    bool drawFlag;
    
    OpcodeRunner runner;
+   
 
    OpcodeExtractor FromV(OpcodeExtractor extractor)
    {
@@ -321,7 +333,16 @@ private:
          return machine.*attribute;
       };
    }
- 
+   
+   OpcodeRunner debugRunner(OpcodeRunner runner, const std::string& message)
+   {
+      return [=](Opcode opcode)
+      {
+         std::cout << message << std::endl;
+         return runner(opcode);
+      };
+   }
+
    template<size_t S>
    OpcodeRunner withMask(Opcode mask, Opcodes<S> runners)
    {
@@ -335,7 +356,7 @@ private:
       {
          auto instruction = (opcode & mask) >> shift;
          auto& runner = runners.at(instruction);
-         runner(opcode);
+         return runner(opcode);
       };
    }
 
@@ -345,7 +366,7 @@ private:
       {
          auto instruction = opcode & mask;
          auto& runner = runners.at(instruction);
-         runner(opcode);
+         return runner(opcode);
       };
    }
  
@@ -353,8 +374,9 @@ private:
    {
       return [this](Opcode opcode)
       {
-         drawFlag = true;
          //TODO:
+         drawFlag = true;
+         return OpcodeRunnerResult::SkippNeeded;
       };
    }
  
@@ -363,6 +385,7 @@ private:
       return [this](Opcode opcode)
       {
          //TODO:
+         return OpcodeRunnerResult::SkippNeeded;
       };
    }
 
@@ -371,6 +394,7 @@ private:
       return [this](Opcode opcode)
       {
          //TODO
+         return OpcodeRunnerResult::SkippNeeded;
       };
    }
 
@@ -379,6 +403,7 @@ private:
       return [this](Opcode opcode)
       {
          //TODO
+         return OpcodeRunnerResult::SkippNeeded;
       };
    }
 
@@ -387,6 +412,7 @@ private:
       return [this](Opcode opcode)
       {
          //TODO
+         return OpcodeRunnerResult::SkippNeeded;
       };
    }
 
@@ -395,6 +421,7 @@ private:
       return [this](Opcode opcode)
       {
          //TODO
+         return OpcodeRunnerResult::SkippNeeded;
       };
    }
 
@@ -403,6 +430,7 @@ private:
       return [lhs, rhs, this](Opcode opcode)
       {
          if (lhs(opcode) == rhs(opcode)) machine.skip();
+         return OpcodeRunnerResult::SkippNeeded;
       };
    }
    
@@ -411,6 +439,7 @@ private:
       return [lhs, rhs, this](Opcode opcode)
       {
          if (lhs(opcode) != rhs(opcode)) machine.skip();
+         return OpcodeRunnerResult::SkippNeeded;
       };
    }
 
@@ -420,6 +449,7 @@ private:
       {
          auto pc = pcExtractor(opcode);
          machine.setProgramCounter(pc);   
+         return OpcodeRunnerResult::SkippNotNeeded;
       };
    }
 
@@ -428,6 +458,7 @@ private:
       return [extractor, opcodeExtractor, this](Opcode opcode)
       {
          machine.setProgramCounter(extractor() + opcodeExtractor(opcode));   
+         return OpcodeRunnerResult::SkippNotNeeded;
       };
    }
 
@@ -442,6 +473,7 @@ private:
          machine.stack[0] = machine.getProgramCounter();
          
          machine.setProgramCounter(extractor(opcode));     
+         return OpcodeRunnerResult::SkippNotNeeded;
       };
    }
    
@@ -467,6 +499,7 @@ private:
       return [attribute, opcodeExtractor, this](Opcode opcode)
       {
          machine.*attribute = opcodeExtractor(opcode);
+         return OpcodeRunnerResult::SkippNeeded;
       };
    }
 
@@ -475,6 +508,7 @@ private:
       return [lhs, rhs, this](Opcode opcode)
       {
          machine.V[lhs(opcode)] = rhs(opcode);
+         return OpcodeRunnerResult::SkippNeeded;
       };
    }
  
@@ -483,6 +517,7 @@ private:
       return [lhs, rhs, this](Opcode opcode)
       {
          machine.V[lhs(opcode)] = rhs();
+         return OpcodeRunnerResult::SkippNeeded;
       };
    }
   
@@ -492,6 +527,7 @@ private:
       return [attribute, opcodeExtractor, this](Opcode opcode)
       {
          machine.*attribute += opcodeExtractor(opcode);
+         return OpcodeRunnerResult::SkippNeeded;
       };
    }
 
@@ -503,6 +539,7 @@ private:
          auto rhs = rhsExtractor(opcode);
          auto V = machine.V[lhs];
          machine.V[lhs] = V + rhs;
+         return OpcodeRunnerResult::SkippNeeded;
       };
    }
   
@@ -511,6 +548,7 @@ private:
       return [lhs, rhs, this](Opcode opcode)
       {
          machine.V[lhs(opcode)] -= rhs(opcode);
+         return OpcodeRunnerResult::SkippNeeded;
       };
    }
   
@@ -519,6 +557,7 @@ private:
       return [lhs, rhs, this](Opcode opcode)
       {
          machine.V[lhs(opcode)] or_eq rhs(opcode);
+         return OpcodeRunnerResult::SkippNeeded;
       };
    }
 
@@ -527,6 +566,7 @@ private:
       return [lhs, rhs, this](Opcode opcode)
       {
          machine.V[lhs(opcode)] and_eq rhs(opcode);
+         return OpcodeRunnerResult::SkippNeeded;
       };
    }
 
@@ -536,6 +576,7 @@ private:
       return [lhs, rhs, this](Opcode opcode)
       {
          machine.V[lhs(opcode)] xor_eq rhs(opcode);
+         return OpcodeRunnerResult::SkippNeeded;
       };
    }
    // If the least-significant bit of Vx is 1, then VF is set to 1, otherwise 0. 
@@ -548,6 +589,7 @@ private:
          auto Vx = machine.V[x];
          machine.V[0xF] = ((lsb(Vx) == 1) ? 1 : 0);
          machine.V[x] /= 2;
+         return OpcodeRunnerResult::SkippNeeded;
       };
    }
 
@@ -564,6 +606,7 @@ private:
          
          machine.V[0xF] = ((Vy > Vx) ? 1 : 0);
          machine.V[x] -= Vy;
+         return OpcodeRunnerResult::SkippNeeded;
       };
    }
 
@@ -578,6 +621,7 @@ private:
          auto Vx = machine.V[x];
          machine.V[0xF] = ((msb(Vx) == 1) ? 1 : 0);
          machine.V[x] *= 2;
+         return OpcodeRunnerResult::SkippNeeded;
       };
    }
 
@@ -609,6 +653,7 @@ private:
             }
          }
          drawFlag = true;
+         return OpcodeRunnerResult::SkippNeeded;
       };
    }
    
@@ -623,6 +668,7 @@ private:
          {
             machine.skip();
          }
+         return OpcodeRunnerResult::SkippNeeded;
       };
    }
 
@@ -637,6 +683,7 @@ private:
          {
             machine.skip();
          }
+         return OpcodeRunnerResult::SkippNeeded;
       };
    }
 
@@ -668,9 +715,9 @@ Chip8::setKeys()
 }
 
 bool
-Chip8::draw()
+Chip8::drawNeeded()
 {
-   return pimpl->draw();
+   return pimpl->drawNeeded();
 }
 
 const Graphics&
