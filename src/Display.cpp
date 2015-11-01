@@ -5,7 +5,7 @@
 
 namespace 
 {
-   static const int8_t PIXEL_SIZE = 10;
+   static const int8_t PIXEL_SIZE = 20;
 }
 
 Display::Display()

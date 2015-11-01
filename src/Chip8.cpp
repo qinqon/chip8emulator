@@ -13,8 +13,6 @@
 
 #include "Chip8Types.h"
 
-#define DEBUG
-
 #ifdef DEBUG 
 #define D(runner) debugRunner(runner, #runner)
 #else
@@ -111,7 +109,7 @@ namespace
       {
          for(size_t i = 0; i < S; i++)
          {
-            output[i] = 0xFF;
+            output[i] = 0x00;
          }
       }
 
