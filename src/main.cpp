@@ -8,6 +8,7 @@
 struct Options
 {
    uint8_t cpu_rate = 0;
+   std::string rom_file;
 };
 
 void setupInput()
@@ -16,7 +17,7 @@ void setupInput()
 
 void printUsage()
 {
-   std::cout << "Usage: chip8emulator [--cpurate|-r rate ]" << std::endl;
+   std::cout << "Usage: chip8emulator --rom-file|-r 'ROM file' [--cpu-rate|-c 'rate' ]" << std::endl;
    exit(EXIT_FAILURE);
 }
 
@@ -27,7 +28,8 @@ Options loadOptions(int argc, char** argv)
 
    static struct option long_options[] = 
    {
-      {"cpu-rate", required_argument,   0, 'r'},
+      {"cpu-rate", required_argument,  0, 'c'},
+      {"rom-file", required_argument,  0, 'r'},
       {"help",    no_argument,         0, 'h'},
       {0, 0, 0, 0}
    };
@@ -37,8 +39,11 @@ Options loadOptions(int argc, char** argv)
    {
       switch (opt) 
       {
-         case 'r':
+         case 'c':
             options.cpu_rate = atoi(optarg);
+            break;
+         case 'r':
+            options.rom_file = optarg;
             break;
          case 'h':
             printUsage();
@@ -72,7 +77,7 @@ int main(int argc, char **argv)
    Chip8 chip8;
    
    chip8.setCpuRate(options.cpu_rate);
-   chip8.loadGame("GAMES/MAZE");
+   chip8.loadGame(options.rom_file);
 
    display.loop(
       [&]{
