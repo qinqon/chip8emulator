@@ -207,8 +207,8 @@ public:
    {{
      D(withMask(0x00FF, 
          Mapping{
-            {0x00E0, clearDisplay()}, 
-            {0x00EE, returnFromSubroutine()}
+            {0x00E0, D(clearDisplay())}, 
+            {0x00EE, D(returnFromSubroutine())}
          }
       )), 
       // 0x01
@@ -222,15 +222,15 @@ public:
       D(addToV(x, kk)),
       D(withMask(0x000F, 
          Opcodes<9>{{
-            setToV(x, Vy),
-            orToV(x, Vy), 
-            andToV(x, Vy),
-            xorToV(x, Vy),  
-            addToV(x, Vy),
-            subtractToV(x, Vy), 
-            shiftRightToVx(), 
-            subtractNumericToVxVy(), 
-            shiftLeftToVx(),
+            D(setToV(x, Vy)),
+            D(orToV(x, Vy)), 
+            D(andToV(x, Vy)),
+            D(xorToV(x, Vy)),  
+            D(addToV(x, Vy)),
+            D(subtractToV(x, Vy)), 
+            D(shiftRightToVx()), 
+            D(subtractNumericToVxVy()), 
+            D(shiftLeftToVx()),
       }})),
       D(skipIfNotEquals(Vx, Vy)),
       // 0x0A
@@ -240,20 +240,20 @@ public:
       D(display(Vx, Vy, n)),
       D(withMask(0x0FF, 
          Mapping{
-            {0x009E, skipIfPressedVx()},
-            {0x00A1, skipIfNotPressedVx()}
+            {0x009E, D(skipIfPressedVx())},
+            {0x00A1, D(skipIfNotPressedVx())}
          })), 
       D(withMask(0x0FF, 
          Mapping{
-            {0x0007, setToV(x, From(&Machine::delayTimer))},
-            {0x000A, setToV(x, keyPressed)},
-            {0x0015, setTo(&Machine::delayTimer, Vx)},
-            {0x0018, setTo(&Machine::soundTimer, Vx)},
-            {0x001E, addTo(&Machine::I, Vx)},
-            {0x0029, setToF(Vx)},
-            {0x0033, setToB(Vx)},
-            {0x0055, storeToMemory(V0, Vx)},
-            {0x0065, readFromMemory(V0, Vx)},
+            {0x0007, D(setToV(x, From(&Machine::delayTimer)))},
+            {0x000A, D(setToV(x, keyPressed))},
+            {0x0015, D(setTo(&Machine::delayTimer, Vx))},
+            {0x0018, D(setTo(&Machine::soundTimer, Vx))},
+            {0x001E, D(addTo(&Machine::I, Vx))},
+            {0x0029, D(setToF(Vx))},
+            {0x0033, D(setToB(Vx))},
+            {0x0055, D(storeToMemory(V0, Vx))},
+            {0x0065, D(readFromMemory(V0, Vx))},
          })),
    }}))
    {} 
@@ -285,6 +285,13 @@ public:
       drawFlag = false;
 
       Opcode opcode = machine.fetchOpcode();
+
+#ifdef DEBUG
+
+      std::cout << "opcode: " << std::hex << opcode << std::endl;
+
+#endif
+
       auto result = runner(opcode);
       if (result == OpcodeRunnerResult::SkippNeeded)
       {
