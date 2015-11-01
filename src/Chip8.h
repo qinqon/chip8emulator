@@ -11,6 +11,7 @@ public:
    Chip8();
    ~Chip8();
    void loadGame(const std::string& name);
+   void setCpuRate(uint8_t);
    void emulateCycle();
    void setKeys();
    bool drawNeeded();

@@ -13,6 +13,8 @@
 
 #include "Chip8Types.h"
 
+#define DEBUG
+
 #ifdef DEBUG 
 #define D(runner) debugRunner(runner, #runner)
 #else
@@ -202,6 +204,7 @@ public:
    ,Vy(FromV(&y)) // alias
    ,V0(FromV(0))  // alias
    ,drawFlag(false)
+   ,cpuRate(0)
    ,runner(withMask(0xF000, 12, Opcodes<26>
    {{
      D(withMask(0x00FF, 
@@ -272,9 +275,15 @@ public:
       }
    }
    
+   void setCpuRate(uint8_t rate)
+   {
+      cpuRate = rate;
+   }
   
    void emulateCycle()
    {
+      emulateCpuRate();
+
       Opcode opcode = machine.fetchOpcode();
       auto result = runner(opcode);
       if (result == OpcodeRunnerResult::SkippNeeded)
@@ -299,13 +308,23 @@ public:
    }
 
 private:
+   
+   void emulateCpuRate()
+   {   
+      if (cpuRate > 0)
+      {
+         // It will sleep for the number of microseconds between cycles
+         usleep(1000000/cpuRate);
+      }
+   }
 
    Machine machine;
    OpcodeExtractor Vx;
    OpcodeExtractor Vy;
    Extractor V0;
    bool drawFlag;
-   
+   uint8_t cpuRate;
+
    OpcodeRunner runner;
    
 
@@ -700,6 +719,12 @@ void
 Chip8::loadGame(const std::string& name)
 {
    pimpl->loadGame(name);
+}
+
+void 
+Chip8::setCpuRate(uint8_t rate)
+{
+   pimpl->setCpuRate(rate);
 }
 
 void 
