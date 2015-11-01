@@ -281,6 +281,8 @@ public:
    void emulateCycle()
    {
       emulateCpuRate();
+      
+      drawFlag = false;
 
       Opcode opcode = machine.fetchOpcode();
       auto result = runner(opcode);

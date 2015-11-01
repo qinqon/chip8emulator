@@ -13,10 +13,11 @@ public:
    
    Display();
 
-   void drawPixel(int8_t x, int8_t y);
+   void drawPixel(size_t x, size_t y);
    void loop(std::function<bool(void)>, std::function<void(void)>);
 private:
    sf::RenderWindow window;
+   sf::VertexArray vertexArray;
 };
 
 #endif // _DISPLAY_H_
