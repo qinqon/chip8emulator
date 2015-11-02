@@ -13,8 +13,6 @@
 
 #include "Chip8Types.h"
 
-#define DEBUG
-
 #ifdef DEBUG 
 #define D(runner) debugRunner(runner, #runner)
 #else
@@ -412,8 +410,8 @@ private:
    {
       return [this](Opcode opcode)
       {
-         machine.setProgramCounter(machine.stack[machine.sp]);
          --machine.sp;
+         machine.setProgramCounter(machine.stack[machine.sp]);
          return OpcodeRunnerResult::SkippNotNeeded;
       };
    }
