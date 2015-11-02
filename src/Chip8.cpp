@@ -13,6 +13,8 @@
 
 #include "Chip8Types.h"
 
+#define DEBUG
+
 #ifdef DEBUG 
 #define D(runner) debugRunner(runner, #runner)
 #else
@@ -252,8 +254,8 @@ public:
             {0x001E, D(addTo(&Machine::I, Vx))},
             {0x0029, D(setToF(Vx))},
             {0x0033, D(setToB(Vx))},
-            {0x0055, D(storeToMemory(V0, Vx))},
-            {0x0065, D(readFromMemory(V0, Vx))},
+            {0x0055, D(storeToMemoryFromV(x))},
+            {0x0065, D(readFromMemoryToV(x))},
          })),
    }}))
    {} 
@@ -301,7 +303,7 @@ public:
    
    void setKeys()
    {
-      //TODO:
+      std::cout << "TODO: setKeys" << std::endl;   
    }
    
    bool drawNeeded()
@@ -400,7 +402,7 @@ private:
    {
       return [this](Opcode opcode)
       {
-         //TODO:
+         std::cout << "TODO: " << std::hex << opcode << " clearDisplay" << std::endl;   
          drawFlag = true;
          return OpcodeRunnerResult::SkippNeeded;
       };
@@ -410,43 +412,54 @@ private:
    {
       return [this](Opcode opcode)
       {
-         //TODO:
+         machine.setProgramCounter(machine.stack[machine.sp]);
+         --machine.sp;
+         return OpcodeRunnerResult::SkippNotNeeded;
+      };
+   }
+
+   OpcodeRunner setToF(OpcodeExtractor valueExtractor)
+   {
+      return [this, valueExtractor](Opcode opcode)
+      {
+         auto value = valueExtractor(opcode);
+         machine.I = chip8_fontset[value];
          return OpcodeRunnerResult::SkippNeeded;
       };
    }
 
-   OpcodeRunner setToF(OpcodeExtractor)
+   OpcodeRunner setToB(OpcodeExtractor valueExtractor)
    {
-      return [this](Opcode opcode)
+      return [this, valueExtractor](Opcode opcode)
       {
-         //TODO
+         auto memory = machine.getMemory();
+         auto I      = machine.I;
+         auto value  = valueExtractor(opcode);
+         memory[I]     = value / 100;
+         memory[I + 1] = (value / 10) % 10;
+         memory[I + 2] = (value % 100) % 10;
          return OpcodeRunnerResult::SkippNeeded;
       };
    }
 
-   OpcodeRunner setToB(OpcodeExtractor)
+   OpcodeRunner storeToMemoryFromV(OpcodeExtractor)
    {
       return [this](Opcode opcode)
       {
-         //TODO
+         std::cout << "TODO: " << std::hex << opcode <<  " storeToMemory" << std::endl;   
          return OpcodeRunnerResult::SkippNeeded;
       };
    }
 
-   OpcodeRunner storeToMemory(Extractor, OpcodeExtractor)
+   OpcodeRunner readFromMemoryToV(OpcodeExtractor endExtractor)
    {
-      return [this](Opcode opcode)
+      return [this, endExtractor](Opcode opcode)
       {
-         //TODO
-         return OpcodeRunnerResult::SkippNeeded;
-      };
-   }
-
-   OpcodeRunner readFromMemory(Extractor, OpcodeExtractor)
-   {
-      return [this](Opcode opcode)
-      {
-         //TODO
+         auto end = endExtractor(opcode);
+         for (size_t i = 0; i <= end; ++i)
+         {
+            machine.V[i] = machine.getMemory()[machine.I + i];
+         }
          return OpcodeRunnerResult::SkippNeeded;
       };
    }
@@ -489,16 +502,17 @@ private:
    }
 
 
-   OpcodeRunner callTo(OpcodeExtractor extractor)
+   OpcodeRunner callTo(OpcodeExtractor addressExtractor)
    {
-      return [extractor, this](Opcode opcode)
+      return [addressExtractor, this](Opcode opcode)
       {
          machine.skip();
          
          // Puts the program counter on the top of the stack
-         machine.stack[0] = machine.getProgramCounter();
-         
-         machine.setProgramCounter(extractor(opcode));     
+         machine.stack[machine.sp] = machine.getProgramCounter();
+         ++machine.sp;
+         auto address = addressExtractor(opcode);
+         machine.setProgramCounter(address);     
          return OpcodeRunnerResult::SkippNotNeeded;
       };
    }
