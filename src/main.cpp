@@ -2,9 +2,41 @@
 #include <future>
 #include <iostream>
 #include <getopt.h>
+#include <unordered_map>
 
 #include "Chip8.h" 
 #include "Display.h"
+
+//Keypad                   Keyboard
+//+-+-+-+-+                +-+-+-+-+
+//|1|2|3|C|                |1|2|3|4|
+//+-+-+-+-+                +-+-+-+-+
+//|4|5|6|D|                |Q|W|E|R|
+//+-+-+-+-+       =>       +-+-+-+-+
+//|7|8|9|E|                |A|S|D|F|
+//+-+-+-+-+                +-+-+-+-+
+//|A|0|B|F|                |Z|X|C|V|
+//+-+-+-+-+                +-+-+-+-+
+
+std::map<sf::Keyboard::Key, Key> sfmlToChip9Key = 
+{
+   {sf::Keyboard::Num1, Key::Num1},      
+   {sf::Keyboard::Num2, Key::Num2},      
+   {sf::Keyboard::Num3, Key::Num3},      
+   {sf::Keyboard::Num4, Key::C},      
+   {sf::Keyboard::Q,    Key::Num4},      
+   {sf::Keyboard::W,    Key::Num5},      
+   {sf::Keyboard::E,    Key::Num6},      
+   {sf::Keyboard::R,    Key::D},      
+   {sf::Keyboard::A,    Key::Num7},      
+   {sf::Keyboard::S,    Key::Num8},      
+   {sf::Keyboard::D,    Key::Num9},      
+   {sf::Keyboard::F,    Key::E},      
+   {sf::Keyboard::Z,    Key::A},      
+   {sf::Keyboard::X,    Key::Num0},      
+   {sf::Keyboard::C,    Key::B},      
+   {sf::Keyboard::V,    Key::F},      
+};
 
 struct Options
 {
@@ -79,30 +111,55 @@ int main(int argc, char **argv)
    
    chip8.setCpuRate(options.cpu_rate);
    chip8.loadGame(options.rom_file);
+   
+   auto drawNeededCallback = [&]
+   {
+      chip8.emulateCycle();
+      return chip8.drawNeeded();
+   };
 
-   display.loop(
-      [&]{
-         chip8.emulateCycle();
-         return chip8.drawNeeded();
-      },
-      [&]{
-         for (size_t y = 0; y < ScreenYLimit; y++)
+   auto drawCallback = [&]
+   {
+      for (size_t y = 0; y < ScreenYLimit; y++)
+      {
+         size_t y_offset = y * ScreenXLimit;
+         for (size_t x = 0; x < ScreenXLimit; x++)
          {
-            size_t y_offset = y * ScreenXLimit;
-            for (size_t x = 0; x < ScreenXLimit; x++)
+            auto bits = std::bitset<8>(chip8.getGraphics().at(y_offset + x));
+            for (size_t i = 0; i < 8; ++i)
             {
-               auto bits = std::bitset<8>(chip8.getGraphics().at(y_offset + x));
-               for (size_t i = 0; i < 8; ++i)
+               if (bits[i])
                {
-                  if (bits[i])
-                  {
-                     display.drawPixel(x, y);
-                  }
+                  display.drawPixel(x, y);
                }
             }
          }
       }
-   );
+   };
+   
+   auto keyPressedCallback = [&]
+   (sf::Keyboard::Key key)
+   {
+      try
+      {
+         chip8.pressKey(sfmlToChip9Key.at(key));
+      }
+      catch(...)
+      {}
+   };
+ 
+   auto keyReleasedCallback = [&]
+   (sf::Keyboard::Key key)
+   {
+      try
+      {
+         chip8.releaseKey(sfmlToChip9Key.at(key));
+      }
+      catch(...)
+      {}
+   };
+
+   display.loop(drawNeededCallback, drawCallback, keyPressedCallback, keyReleasedCallback);
 
    return 0;
 }

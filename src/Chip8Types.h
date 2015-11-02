@@ -11,7 +11,6 @@ using Address = uint16_t;
 using Register = uint8_t;
 
 using Counter = uint16_t;
-
 using Timer = uint8_t;
 
 // The Chip 8 has 4K memory in total
@@ -29,5 +28,18 @@ using Registers = std::array<Register, 16>;
 const size_t ScreenXLimit = 64;
 const size_t ScreenYLimit = 32;
 using Graphics = std::array<Register, ScreenXLimit * ScreenYLimit>;
+
+// They key has 16 keys and two states
+enum class KeyState {Pressed, Released};
+enum class Key{
+   Num1, Num2, Num3, C,
+   Num4, Num5, Num6, D,
+   Num7, Num8, Num9, E,
+   A,    Num0, B,    F,
+};
+
+using Keypad = std::array<KeyState, 16>;
+
+
 
 #endif // _CHIP8TYPES_HH_

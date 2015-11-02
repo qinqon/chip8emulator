@@ -58,6 +58,7 @@ namespace
          clear(memory);
          clear(graphics);
          clear(V);
+         clear(keypad, KeyState::Released);
 
          loadFonset();  
       }
@@ -99,17 +100,18 @@ namespace
       Timer delayTimer;
       Timer soundTimer;
       Graphics graphics;
+      Keypad keypad;
    private:
  
       Memory memory;
       Counter pc;
       
       template<typename T, size_t S>
-      void clear(std::array<T, S>& output)
+      void clear(std::array<T, S>& output, T value = 0x00)
       {
          for(size_t i = 0; i < S; i++)
          {
-            output[i] = 0x00;
+            output[i] = value;
          }
       }
 
@@ -172,7 +174,9 @@ namespace
    // Wait for a key to be pressed and return the value
    Register keyPressed()
    {
+      std::cout << "TODO: keyPressed" << std::endl;
       Register buf = 0;
+      /*
       struct termios old = {0};
       if (tcgetattr(0, &old) < 0)
          perror("tcsetattr()");
@@ -188,6 +192,7 @@ namespace
       old.c_lflag |= ECHO;
       if (tcsetattr(0, TCSADRAIN, &old) < 0)
          perror ("tcsetattr ~ICANON");
+      */
       return (buf);
    }
 
@@ -205,12 +210,12 @@ public:
    ,cpuRate(0)
    ,runner(withMask(0xF000, 12, Opcodes<26>
    {{
-     D(withMask(0x00FF, 
+     withMask(0x00FF, 
          Mapping{
             {0x00E0, D(clearDisplay())}, 
             {0x00EE, D(returnFromSubroutine())}
          }
-      )), 
+      ), 
       // 0x01
       D(jumpTo(nnn)), 
       D(callTo(nnn)),
@@ -220,7 +225,7 @@ public:
       D(skipIfEquals(Vx, Vy)),
       D(setToV(x, kk)),
       D(addToV(x, kk)),
-      D(withMask(0x000F, 
+      withMask(0x000F, 
          Opcodes<9>{{
             D(setToV(x, Vy)),
             D(orToV(x, Vy)), 
@@ -231,19 +236,19 @@ public:
             D(shiftRightToVx()), 
             D(subtractNumericToVxVy()), 
             D(shiftLeftToVx()),
-      }})),
+      }}),
       D(skipIfNotEquals(Vx, Vy)),
       // 0x0A
       D(setTo(&Machine::I, nnn)),
       D(jumpTo(V0, nnn)),
       D(setToV(x, randomAnd(kk))),
       D(display(Vx, Vy, n)),
-      D(withMask(0x0FF, 
+      withMask(0x0FF, 
          Mapping{
             {0x009E, D(skipIfPressedVx())},
             {0x00A1, D(skipIfNotPressedVx())}
-         })), 
-      D(withMask(0x0FF, 
+         }), 
+      withMask(0x0FF, 
          Mapping{
             {0x0007, D(setToV(x, From(&Machine::delayTimer)))},
             {0x000A, D(setToV(x, keyPressed))},
@@ -254,7 +259,7 @@ public:
             {0x0033, D(setToB(Vx))},
             {0x0055, D(storeToMemoryFromV(x))},
             {0x0065, D(readFromMemoryToV(x))},
-         })),
+         }),
    }}))
    {} 
 
@@ -278,17 +283,36 @@ public:
       cpuRate = rate;
    }
   
+   void emulateTimers()
+   {
+      if (machine.delayTimer > 0)
+      {
+         --machine.delayTimer;
+      }
+
+      if(machine.soundTimer > 0)
+      {
+         if(machine.soundTimer == 1)
+         {
+            std::cout << "BEEP!" << std::endl;
+         }
+         --machine.soundTimer;
+      }  
+   }
+
    void emulateCycle()
    {
       emulateCpuRate();
       
+      emulateTimers();
+
       drawFlag = false;
 
       Opcode opcode = machine.fetchOpcode();
 
 #ifdef DEBUG
 
-      std::cout << "opcode: " << std::hex << opcode << std::endl;
+      std::cout << "opcode: " << std::hex << opcode << " ->";
 
 #endif
 
@@ -299,10 +323,17 @@ public:
       }
    }
    
-   void setKeys()
+   void pressKey(Key key)
    {
-      std::cout << "TODO: setKeys" << std::endl;   
+      machine.keypad[static_cast<size_t>(key)] = KeyState::Pressed;
    }
+
+ 
+   void releaseKey(Key key)
+   {
+      machine.keypad[static_cast<size_t>(key)] = KeyState::Released;
+   }
+
    
    bool drawNeeded()
    {
@@ -702,7 +733,7 @@ private:
       return [&](Opcode opcode)
       {
          auto Vx = machine.V[::x(opcode)];
-         if (Vx == keyPressed())
+         if (machine.keypad[Vx] == KeyState::Pressed)
          {
             machine.skip();
          }
@@ -717,7 +748,7 @@ private:
       return [&](Opcode opcode)
       {
          auto Vx = machine.V[::x(opcode)];
-         if (Vx != keyPressed())
+         if (machine.keypad[Vx] == KeyState::Released)
          {
             machine.skip();
          }
@@ -753,9 +784,16 @@ Chip8::emulateCycle()
 }
 
 void 
-Chip8::setKeys()
+Chip8::pressKey(Key key)
 {
-   pimpl->setKeys();
+   pimpl->pressKey(key);
+}
+
+
+void 
+Chip8::releaseKey(Key key)
+{
+   pimpl->releaseKey(key);
 }
 
 bool

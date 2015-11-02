@@ -13,7 +13,8 @@ public:
    void loadGame(const std::string& name);
    void setCpuRate(uint8_t);
    void emulateCycle();
-   void setKeys();
+   void pressKey(Key);
+   void releaseKey(Key);
    bool drawNeeded();
    const Graphics& getGraphics() const;
 private:

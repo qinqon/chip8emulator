@@ -30,7 +30,10 @@ Display::drawPixel(size_t x, size_t y)
 }
 
 void
-Display::loop(std::function<bool(void)> drawNeeded, std::function<void(void)> doDrawing)
+Display::loop(std::function<bool(void)> drawNeeded, 
+              std::function<void(void)> doDrawing, 
+              std::function<void(sf::Keyboard::Key)> keyPressed,
+              std::function<void(sf::Keyboard::Key)> keyReleased)
 {
    while (window.isOpen())
    {
@@ -40,6 +43,15 @@ Display::loop(std::function<bool(void)> drawNeeded, std::function<void(void)> do
          if (event.type == sf::Event::Closed)
          {
             window.close();
+         }
+
+         if (event.type == sf::Event::KeyPressed)
+         {
+            keyPressed(event.key.code);
+         }
+         else if (event.type == sf::Event::KeyReleased)
+         {
+            keyReleased(event.key.code);
          }
       }
       
