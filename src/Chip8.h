@@ -2,6 +2,7 @@
 #define _CHIP8_H_
 
 #include <string>
+#include <memory>
 
 #include "Chip8Types.h"
 

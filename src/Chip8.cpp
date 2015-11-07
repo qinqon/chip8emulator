@@ -72,7 +72,28 @@ namespace
       {
          return memory.data();
       }
+        
+      void printV(std::ostream& output, size_t begin, size_t end)
+      {
+         for (size_t i = begin; i < end; ++i)
+         {
+            output << "machine.V[" << i << "] = " << std::hex << unsigned(V[i]) << std::endl;
+         }        
+      }
       
+      void printMemory(std::ostream& output, size_t begin, size_t end)
+      {
+         for (size_t i = begin; i < end; ++i)
+         {
+            output << "machine.memory[" << i << "] = " << std::hex << unsigned(memory[i]) << std::endl;
+         }        
+      }
+
+      void printI(std::ostream& output)
+      {
+         output << "machine.I = " << std::hex << unsigned(I) << std::endl;
+      }
+
       Memory::size_type getMemorySize()
       {
          return memory.size();
@@ -117,7 +138,7 @@ namespace
 
       void loadFonset()
       {
-         for (auto i = 0; i < chip8_fontset.size(); ++i)
+         for (size_t i = 0; i < chip8_fontset.size(); ++i)
          {
             memory[i] = chip8_fontset[i]; 
          }
@@ -452,7 +473,11 @@ private:
       return [this, valueExtractor](Opcode opcode)
       {
          auto value = valueExtractor(opcode);
-         machine.I = chip8_fontset[value];
+         // Each font pixel has a size of 5
+         machine.I = value * 5;
+#ifdef DEBUG
+         machine.printI(std::cout);
+#endif // DEBUG
          return OpcodeRunnerResult::SkippNeeded;
       };
    }
@@ -467,6 +492,9 @@ private:
          memory[I]     = value / 100;
          memory[I + 1] = (value / 10) % 10;
          memory[I + 2] = (value % 100) % 10;
+#ifdef DEBUG
+         machine.printMemory(std::cout, I, I + 3);
+#endif // DEBUG
          return OpcodeRunnerResult::SkippNeeded;
       };
    }
@@ -487,8 +515,12 @@ private:
          auto end = endExtractor(opcode);
          for (size_t i = 0; i <= end; ++i)
          {
-            machine.V[i] = machine.getMemory()[machine.I + i];
+            auto memoryIndex = machine.I + i;
+            machine.V[i] = machine.getMemory()[memoryIndex];
          }
+#ifdef DEBUG
+         machine.printV(std::cout, 0, end + 1);
+#endif // DEBUG
          return OpcodeRunnerResult::SkippNeeded;
       };
    }

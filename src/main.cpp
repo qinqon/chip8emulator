@@ -1,4 +1,5 @@
 #include <array>
+#include <bitset>
 #include <future>
 #include <iostream>
 #include <getopt.h>
@@ -68,7 +69,7 @@ Options loadOptions(int argc, char** argv)
    };
   
    int option_index = 0;
-   while ((opt = getopt_long (argc, argv, "r:h", long_options, &option_index)) != -1)
+   while ((opt = getopt_long (argc, argv, "r:ch", long_options, &option_index)) != -1)
    {
       switch (opt) 
       {

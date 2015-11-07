@@ -1,6 +1,8 @@
 #ifndef _CHIP8TYPES_HH_
 #define _CHIP8TYPES_HH_
 
+#include <array>
+
 // 16 bits are needed for the opcodes
 using Opcode = uint16_t;
 
