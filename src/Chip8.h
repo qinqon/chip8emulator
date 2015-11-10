@@ -17,6 +17,7 @@ public:
    void pressKey(Key);
    void releaseKey(Key);
    bool drawNeeded();
+   bool beepNeeded();
    const Graphics& getGraphics() const;
 private:
    class Pimpl;

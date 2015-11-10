@@ -13,7 +13,14 @@ Display::Display()
 // Each pixel will be the 10x10
 :window(sf::VideoMode(ScreenXLimit * PIXEL_SIZE, ScreenYLimit * PIXEL_SIZE), "Chip-8 emulator")
 ,vertexArray(sf::Quads)
-{}
+{
+   if (not beepBuffer.loadFromFile("resources/beep.wav"))
+   {
+      throw std::runtime_error("Beep wav file not found");
+   }
+   beep.setBuffer(beepBuffer);
+
+}
 
 void
 Display::drawPixel(size_t x, size_t y)
@@ -30,7 +37,7 @@ Display::drawPixel(size_t x, size_t y)
 }
 
 void
-Display::loop(std::function<bool(void)> drawNeeded, 
+Display::loop(std::function<std::pair<bool, bool>(void)> doCycle, 
               std::function<void(void)> doDrawing, 
               std::function<void(sf::Keyboard::Key)> keyPressed,
               std::function<void(sf::Keyboard::Key)> keyReleased)
@@ -55,13 +62,21 @@ Display::loop(std::function<bool(void)> drawNeeded,
          }
       }
       
-      if (drawNeeded())
+      bool drawNeeded = false;
+      bool beepNeeded = false;
+      std::tie(drawNeeded, beepNeeded) = doCycle();
+      if (drawNeeded)
       {
          window.clear();
          vertexArray.clear();
          doDrawing();
          window.draw(vertexArray);
          window.display();
+      }
+      if(beepNeeded)
+      { 
+         std::cout << "BEEP !!!" << std::endl;
+         beep.play();
       }
    }
 }

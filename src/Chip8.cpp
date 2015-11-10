@@ -235,6 +235,7 @@ public:
    ,Vy(FromV(&y)) // alias
    ,V0(FromV(0))  // alias
    ,drawFlag(false)
+   ,beepFlag(false)
    ,cpuRate(0)
    ,runner(withMask(0xF000, 12, Opcodes<26>
    {{
@@ -322,20 +323,27 @@ public:
       {
          if(machine.soundTimer == 1)
          {
-            std::cout << "BEEP!" << std::endl;
+            beepFlag = true;
          }
          --machine.soundTimer;
       }  
    }
 
+   void resetFlags()
+   {
+      drawFlag = false;
+      beepFlag = false;
+   }
+
    void emulateCycle()
    {
+      resetFlags();
+      
       emulateCpuRate();
       
       emulateTimers();
-
-      drawFlag = false;
-
+      
+      
       Opcode opcode = machine.fetchOpcode();
 
 #ifdef DEBUG
@@ -362,7 +370,12 @@ public:
       machine.keypad[static_cast<size_t>(key)] = KeyState::Released;
    }
 
-   
+    
+   bool beepNeeded()
+   {
+      return beepFlag;
+   }
+
    bool drawNeeded()
    {
       return drawFlag;
@@ -389,6 +402,7 @@ private:
    OpcodeExtractor Vy;
    Extractor V0;
    bool drawFlag;
+   bool beepFlag;
    uint8_t cpuRate;
 
    OpcodeRunner runner;
@@ -862,6 +876,12 @@ bool
 Chip8::drawNeeded()
 {
    return pimpl->drawNeeded();
+}
+
+bool
+Chip8::beepNeeded()
+{
+   return pimpl->beepNeeded();
 }
 
 const Graphics&

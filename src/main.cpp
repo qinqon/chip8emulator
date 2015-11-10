@@ -113,12 +113,12 @@ int main(int argc, char **argv)
    chip8.setCpuRate(options.cpu_rate);
    chip8.loadGame(options.rom_file);
    
-   auto drawNeededCallback = [&]
+   auto cycleCallback = [&]
    {
       chip8.emulateCycle();
-      return chip8.drawNeeded();
+      return std::make_pair(chip8.drawNeeded(), chip8.beepNeeded());
    };
-
+ 
    auto drawCallback = [&]
    {
       for (size_t y = 0; y < ScreenYLimit; y++)
@@ -160,7 +160,7 @@ int main(int argc, char **argv)
       {}
    };
 
-   display.loop(drawNeededCallback, drawCallback, keyPressedCallback, keyReleasedCallback);
+   display.loop(cycleCallback, drawCallback, keyPressedCallback, keyReleasedCallback);
 
    return 0;
 }

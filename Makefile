@@ -1,6 +1,6 @@
 CXX=g++
 CXXFLAGS=-g -O0 -c -Wall -std=c++11 -Werror -pedantic -I/usr/local/include/
-LDFLAGS=-L/usr/local/lib -lsfml-graphics -lsfml-window -lsfml-system
+LDFLAGS=-L/usr/local/lib -lsfml-graphics -lsfml-window -lsfml-system -lsfml-audio
 SOURCES=$(wildcard src/*.cpp)
 OBJECTS=$(SOURCES:.cpp=.o)
 EXECUTABLE=chip8emulator
