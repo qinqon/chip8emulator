@@ -80,6 +80,13 @@ namespace
             output << "machine.V[" << i << "] = " << std::hex << unsigned(V[i]) << std::endl;
          }        
       }
+
+ 
+      void printV(std::ostream& output, size_t idx)
+      {
+         printV(output, idx, idx + 1);
+      }
+
       
       void printMemory(std::ostream& output, size_t begin, size_t end)
       {
@@ -529,7 +536,16 @@ private:
    {
       return [lhs, rhs, this](Opcode opcode)
       {
-         if (lhs(opcode) == rhs(opcode)) machine.skip();
+#ifdef DEBUG
+         std::cout << "lhs: " << lhs(opcode) << " , rhs: " << rhs(opcode) << std::endl;
+#endif // DEBUG
+         if (lhs(opcode) == rhs(opcode))
+         {
+#ifdef DEBUG
+            std::cout << "Skipped!!!" << std::endl;
+#endif // DEBUG
+            machine.skip();
+         }
          return OpcodeRunnerResult::SkippNeeded;
       };
    }
@@ -643,12 +659,21 @@ private:
          return OpcodeRunnerResult::SkippNeeded;
       };
    }
-  
+
+   //Set Vx = Vx - Vy, set VF = NOT borrow.
+   //
+   //If Vx > Vy, then VF is set to 1, otherwise 0. Then Vy is subtracted from Vx, and the results stored in Vx.
    OpcodeRunner subtractToV(OpcodeExtractor lhs, OpcodeExtractor rhs)
    {
       return [lhs, rhs, this](Opcode opcode)
-      {
-         machine.V[lhs(opcode)] -= rhs(opcode);
+      {  
+         auto lhsIndex = lhs(opcode);
+         auto lhsValue = machine.V[lhsIndex];
+         auto rhsValue = rhs(opcode);
+         
+         machine.V[0xF] = ((lhsValue > rhsValue) ? 1 : 0);
+
+         machine.V[lhsIndex] -= rhsValue;
          return OpcodeRunnerResult::SkippNeeded;
       };
    }
@@ -754,6 +779,11 @@ private:
             }
          }
          drawFlag = true;
+#ifdef DEBUG
+
+         machine.printV(std::cout, 0xF);
+
+#endif // DEBUG
          return OpcodeRunnerResult::SkippNeeded;
       };
    }

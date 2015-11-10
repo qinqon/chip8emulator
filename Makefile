@@ -1,5 +1,5 @@
 CXX=g++
-CXXFLAGS=-g -O0 -c -Wall -DDEBUG -std=c++11 -Werror -pedantic -I/usr/local/include/
+CXXFLAGS=-g -O0 -c -Wall -std=c++11 -Werror -pedantic -I/usr/local/include/
 LDFLAGS=-L/usr/local/lib -lsfml-graphics -lsfml-window -lsfml-system
 SOURCES=$(wildcard src/*.cpp)
 OBJECTS=$(SOURCES:.cpp=.o)
