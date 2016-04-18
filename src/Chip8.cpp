@@ -291,7 +291,7 @@ public:
          }),
    }}))
    {} 
-
+   
    void loadGame(const std::string& name)
    {
       std::ifstream file(name, std::ios::binary);
@@ -305,8 +305,18 @@ public:
 
          file.close();
       }
+      else
+      {
+         throw std::invalid_argument(std::string("Cannot open game ") + name);
+      }
    }
-   
+
+   void loadGame(std::function<void(Register*)> gameLoader)
+   {
+         // The game has to be loaded after the the poss 0x200
+         gameLoader(&machine.getMemory()[0x200]);
+   }
+
    void setCpuRate(uint8_t rate)
    {
       cpuRate = rate;
@@ -337,14 +347,24 @@ public:
 
    void emulateCycle()
    {
+#ifdef DEBUG
+
+      std::cout << "emulateCycle: " << std::endl;
+
+#endif
+
       resetFlags();
       
       emulateCpuRate();
       
       emulateTimers();
       
-      
+#ifdef DEBUG
+
+      std::cout << "Fetching opcode" << std::endl;
+#endif       
       Opcode opcode = machine.fetchOpcode();
+
 
 #ifdef DEBUG
 
@@ -845,6 +865,12 @@ void
 Chip8::loadGame(const std::string& name)
 {
    pimpl->loadGame(name);
+}
+
+void 
+Chip8::loadGame(std::function<void(Register*)> gameLoader)
+{
+   pimpl->loadGame(gameLoader);
 }
 
 void 

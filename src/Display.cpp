@@ -4,44 +4,35 @@
 #include <ctime>
 #include <iostream>
 
-namespace 
-{
-   static const int8_t PIXEL_SIZE = 20;
-}
-
 Display::Display()
-// Each pixel will be the 10x10
-:window(sf::VideoMode(ScreenXLimit * PIXEL_SIZE, ScreenYLimit * PIXEL_SIZE), "Chip-8 emulator")
-,vertexArray(sf::Quads)
+:window(sf::VideoMode::getFullscreenModes()[0], "Chip-8 emulator")
+,pixelWidth(window.getSize().x / ScreenXLimit)
+,pixelHigh(window.getSize().y /ScreenYLimit)
 {
-   if (not beepBuffer.loadFromFile("resources/beep.wav"))
+   if (not beepBuffer.loadFromFile("beep.wav"))
    {
       throw std::runtime_error("Beep wav file not found");
    }
    beep.setBuffer(beepBuffer);
-
 }
 
 void
 Display::drawPixel(size_t x, size_t y)
 {
-   auto x1 = PIXEL_SIZE * x;
-   auto y1 = PIXEL_SIZE * y;
-   auto x2 = x1 + PIXEL_SIZE;
-   auto y2 = y1 + PIXEL_SIZE;
-   
-   vertexArray.append({sf::Vector2f(x1, y1), sf::Color::Green});
-   vertexArray.append({sf::Vector2f(x2, y1), sf::Color::Green});
-   vertexArray.append({sf::Vector2f(x2, y2), sf::Color::Green});
-   vertexArray.append({sf::Vector2f(x1, y2), sf::Color::Green});
+   sf::RectangleShape rectangle(sf::Vector2f(pixelWidth, pixelHigh));
+   rectangle.setPosition(x * pixelWidth, y * pixelHigh);
+   rectangle.setFillColor(sf::Color::Green);  
+   window.draw(rectangle);
 }
 
 void
-Display::loop(std::function<std::pair<bool, bool>(void)> doCycle, 
-              std::function<void(void)> doDrawing, 
-              std::function<void(sf::Keyboard::Key)> keyPressed,
-              std::function<void(sf::Keyboard::Key)> keyReleased)
+Display::loop(CycleCallback doCycle, 
+              DrawingCallback doDrawing, 
+              KeyboardCallbacks keyboard, 
+              TouchpadCallbacks touchpad
+)
 {
+   sf::View view = window.getDefaultView();
    while (window.isOpen())
    {
       sf::Event event;
@@ -51,14 +42,31 @@ Display::loop(std::function<std::pair<bool, bool>(void)> doCycle,
          {
             window.close();
          }
-
-         if (event.type == sf::Event::KeyPressed)
+         else if (event.type == sf::Event::Resized)
          {
-            keyPressed(event.key.code);
+            view.setSize(event.size.width, event.size.height);
+            view.setCenter(event.size.width/2, event.size.height/2);
+            window.setView(view);
+         }
+         else if (event.type == sf::Event::KeyPressed)
+         {
+            keyboard.keyPressed(event.key.code);
          }
          else if (event.type == sf::Event::KeyReleased)
          {
-            keyReleased(event.key.code);
+            keyboard.keyReleased(event.key.code);
+         }
+         else if (event.type == sf::Event::TouchBegan)
+         {
+            touchpad.touchBegan(event.touch);
+         }
+         else if (event.type == sf::Event::TouchEnded)
+         {
+            touchpad.touchEnded(event.touch);
+         }
+         else if (event.type == sf::Event::TouchMoved)
+         {
+            touchpad.touchMoved(event.touch);
          }
       }
       
@@ -67,8 +75,15 @@ Display::loop(std::function<std::pair<bool, bool>(void)> doCycle,
       std::tie(drawNeeded, beepNeeded) = doCycle();
       if (drawNeeded)
       {
-         window.clear();
+         window.clear(sf::Color::Black);
          vertexArray.clear();
+         sf::RectangleShape rectangle(sf::Vector2f(ScreenXLimit * pixelWidth, ScreenYLimit * pixelHigh));
+         rectangle.setFillColor(sf::Color::Black);  
+         rectangle.setOutlineColor(sf::Color::Green);
+         rectangle.setOutlineThickness(1);
+         window.draw(rectangle);
+
+
          doDrawing();
          window.draw(vertexArray);
          window.display();

@@ -2,6 +2,7 @@
 #define _CHIP8TYPES_HH_
 
 #include <array>
+#include <iostream>
 
 // 16 bits are needed for the opcodes
 using Opcode = uint16_t;
@@ -39,6 +40,37 @@ enum class Key{
    Num7, Num8, Num9, E,
    A,    Num0, B,    F,
 };
+
+inline std::ostream& operator << (std::ostream& out, const Key& key)
+{
+   if (key == Key::Num1)
+      out << "Num1";
+   else if (key == Key::Num2)
+      out << "Num2";
+   else if (key == Key::Num3)
+      out << "Num3";
+   else if (key == Key::Num4)
+      out << "Num4";
+   else if (key == Key::Num5)
+      out << "Num5";
+   else if (key == Key::Num6)
+      out << "Num6";
+   else if (key == Key::Num7)
+      out << "Num7";
+   else if (key == Key::A)
+      out << "A";
+   else if (key == Key::B)
+      out << "B";
+   else if (key == Key::C)
+      out << "C";
+   else if (key == Key::D)
+      out << "D";
+   else if (key == Key::E)
+      out << "E";
+   else if (key == Key::F)
+      out << "F";
+   return out;
+}
 
 using Keypad = std::array<KeyState, 16>;
 

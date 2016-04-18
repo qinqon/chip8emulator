@@ -1,6 +1,7 @@
 #ifndef _CHIP8_H_
 #define _CHIP8_H_
 
+#include <functional>
 #include <string>
 #include <memory>
 
@@ -12,6 +13,7 @@ public:
    Chip8();
    ~Chip8();
    void loadGame(const std::string& name);
+   void loadGame(std::function<void(Register*)>);
    void setCpuRate(uint8_t);
    void emulateCycle();
    void pressKey(Key);
