@@ -14,7 +14,7 @@ public:
    ~Chip8();
    void loadGame(const std::string& name);
    void loadGame(std::function<void(Register*)>);
-   void setCpuRate(uint8_t);
+   void setCpuRate(uint32_t);
    void emulateCycle();
    void pressKey(Key);
    void releaseKey(Key);

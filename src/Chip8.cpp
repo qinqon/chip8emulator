@@ -317,7 +317,7 @@ public:
          gameLoader(&machine.getMemory()[0x200]);
    }
 
-   void setCpuRate(uint8_t rate)
+   void setCpuRate(uint32_t rate)
    {
       cpuRate = rate;
    }
@@ -423,7 +423,7 @@ private:
    Extractor V0;
    bool drawFlag;
    bool beepFlag;
-   uint8_t cpuRate;
+   uint32_t cpuRate;
 
    OpcodeRunner runner;
    
@@ -874,7 +874,7 @@ Chip8::loadGame(std::function<void(Register*)> gameLoader)
 }
 
 void 
-Chip8::setCpuRate(uint8_t rate)
+Chip8::setCpuRate(uint32_t rate)
 {
    pimpl->setCpuRate(rate);
 }

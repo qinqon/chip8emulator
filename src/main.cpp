@@ -41,7 +41,7 @@ std::map<sf::Keyboard::Key, Key> sfmlToChip9Key =
 
 struct Options
 {
-   uint8_t cpu_rate = 0;
+   uint32_t cpu_rate = 0;
    std::string rom_file;
 };
 
@@ -74,6 +74,10 @@ Options loadOptions(int argc, char** argv)
       switch (opt) 
       {
          case 'c':
+            if (optarg == nullptr)
+            {
+               throw std::invalid_argument("Invalid cpu rate");
+            }
             options.cpu_rate = atoi(optarg);
             break;
          case 'r':
@@ -138,7 +142,10 @@ int main(int argc, char **argv)
       }
    };
    
-   auto keyPressedCallback = [&]
+   Display::KeyboardCallbacks keyboard;
+   Display::TouchpadCallbacks touchpad;
+   
+   keyboard.keyPressed = [&]
    (sf::Keyboard::Key key)
    {
       try
@@ -149,7 +156,7 @@ int main(int argc, char **argv)
       {}
    };
  
-   auto keyReleasedCallback = [&]
+   keyboard.keyReleased = [&]
    (sf::Keyboard::Key key)
    {
       try
@@ -159,8 +166,10 @@ int main(int argc, char **argv)
       catch(...)
       {}
    };
+   
 
-   display.loop(cycleCallback, drawCallback, keyPressedCallback, keyReleasedCallback);
+
+   display.loop(cycleCallback, drawCallback, keyboard, touchpad);
 
    return 0;
 }

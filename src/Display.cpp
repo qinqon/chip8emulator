@@ -6,8 +6,8 @@
 
 Display::Display()
 :window(sf::VideoMode::getFullscreenModes()[0], "Chip-8 emulator")
-,pixelWidth(window.getSize().x / ScreenXLimit)
 ,pixelHigh(window.getSize().y /ScreenYLimit)
+,pixelWidth(window.getSize().x / ScreenXLimit)
 {
    if (not beepBuffer.loadFromFile("beep.wav"))
    {
