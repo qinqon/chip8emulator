@@ -77,13 +77,6 @@ Display::loop(CycleCallback doCycle,
       {
          window.clear(sf::Color::Black);
          vertexArray.clear();
-         sf::RectangleShape rectangle(sf::Vector2f(ScreenXLimit * pixelWidth, ScreenYLimit * pixelHigh));
-         rectangle.setFillColor(sf::Color::Black);  
-         rectangle.setOutlineColor(sf::Color::Green);
-         rectangle.setOutlineThickness(1);
-         window.draw(rectangle);
-
-
          doDrawing();
          window.draw(vertexArray);
          window.display();

@@ -52,16 +52,16 @@ class androidbuf : public std::streambuf {
 std::deque<std::pair<sf::IntRect, Key>> pongTouchAreaToKey = 
 {
    // Upper left area player1 up
-   {{0, 0, 350, 350}, Key::Num1},
+   {{0, 0, 350, 350}, Key::Num2},
 
    // Button left area player1 down
    {{0, 350, 350, 350}, Key::Num4},
 
    // Upper right area player2 up
-   {{0, 0, 0, 0}, Key::C},
+   {{1000, 0, 350, 350}, Key::A},
 
    // Button right area player2 down
-   {{0, 0, 0, 0}, Key::D},
+   {{1000, 350, 350, 350}, Key::Num0},
 };
 
 int main(void)
@@ -75,10 +75,10 @@ int main(void)
    std::cout << "Starting Chip-8 emulator" << std::endl;
    Display display;
    Chip8 chip8;
-   chip8.setCpuRate(250);
+   chip8.setCpuRate(0);
    chip8.loadGame([](Register* offset){
       sf::FileInputStream gameFile;
-      if (not gameFile.open("PONG"))
+      if (not gameFile.open("PONG2"))
       {
          throw std::invalid_argument("Cannot open game");
       }
@@ -127,6 +127,7 @@ int main(void)
    touchpad.touchBegan = 
    [&](const sf::Event::TouchEvent& touch)
    {
+      std::cout << "Touch began: " << touch.x << ", " << touch.y << std::endl;
       for (const auto& areaAndKey : pongTouchAreaToKey)
       {
          if (areaAndKey.first.contains(touch.x, touch.y))
@@ -139,6 +140,7 @@ int main(void)
    touchpad.touchEnded = 
    [&](const sf::Event::TouchEvent& touch)
    {
+      std::cout << "Touch ended: " << touch.x << ", " << touch.y << std::endl;
       for (const auto& areaAndKey : pongTouchAreaToKey)
       {
          if (areaAndKey.first.contains(touch.x, touch.y))

@@ -43,7 +43,9 @@ enum class Key{
 
 inline std::ostream& operator << (std::ostream& out, const Key& key)
 {
-   if (key == Key::Num1)
+   if (key == Key::Num0)
+      out << "Num0";
+   else if (key == Key::Num1)
       out << "Num1";
    else if (key == Key::Num2)
       out << "Num2";

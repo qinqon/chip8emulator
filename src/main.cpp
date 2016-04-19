@@ -146,22 +146,26 @@ int main(int argc, char **argv)
    Display::TouchpadCallbacks touchpad;
    
    keyboard.keyPressed = [&]
-   (sf::Keyboard::Key key)
+   (sf::Keyboard::Key sfKey)
    {
       try
       {
-         chip8.pressKey(sfmlToChip9Key.at(key));
+         auto key = sfmlToChip9Key.at(sfKey);
+         std::cout << "Pressing key " << key << std::endl;
+         chip8.pressKey(key);
       }
       catch(...)
       {}
    };
  
    keyboard.keyReleased = [&]
-   (sf::Keyboard::Key key)
+   (sf::Keyboard::Key sfKey)
    {
       try
       {
-         chip8.releaseKey(sfmlToChip9Key.at(key));
+         auto key = sfmlToChip9Key.at(sfKey);
+         std::cout << "Releasing key " << key << std::endl;
+         chip8.releaseKey(key);
       }
       catch(...)
       {}
