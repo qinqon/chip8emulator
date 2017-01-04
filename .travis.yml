@@ -2,8 +2,16 @@
 language: cpp
 # Compiler selection
 compiler:
-  - clang
   - gcc
 # Build steps
 script:
   - make
+addons:
+  apt:
+    sources:
+    # add PPAs with more up-to-date toolchains
+    - ubuntu-toolchain-r-test
+    packages:
+    # install toolchains
+    - gcc-5
+    - g++-5
