@@ -1,17 +1,13 @@
-# Enable C++ support
+sudo: false
 language: cpp
-# Compiler selection
 compiler:
   - gcc
-# Build steps
-script:
-  - make
+install:
+- export CXX="g++-4.8" CC="gcc-4.8"
 addons:
   apt:
     sources:
-    # add PPAs with more up-to-date toolchains
     - ubuntu-toolchain-r-test
     packages:
-    # install toolchains
-    - gcc-5
-    - g++-5
+    - gcc-4.8
+    - g++-4.8
